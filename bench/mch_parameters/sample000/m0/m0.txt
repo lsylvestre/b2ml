@@ -1,0 +1,3 @@
+MACHINE m0(x)
+
+END

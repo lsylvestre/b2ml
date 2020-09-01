@@ -1,0 +1,6 @@
+à la compilation :
+
+~> type : struct(y:'a4,{..:'s1}) (line 9, characters 121-134)
+
+
+or on voudrait qqch comme struct(x:'a3,y:'a4,{..:'s1})

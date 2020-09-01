@@ -1,0 +1,13 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+CONCRETE_VARIABLES r
+  OPERATIONS
+    u <-- op = 
+      BEGIN 
+       u'x := u'y;
+       #print_type u
+      END
+
+END
+

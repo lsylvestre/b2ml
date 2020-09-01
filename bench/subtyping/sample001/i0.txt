@@ -1,0 +1,16 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+ VALUES c = rec(x:TRUE,y:FALSE)
+
+OPERATIONS
+
+  op(r) = 
+    BEGIN 
+      VAR a IN a := r'x + 2 END
+    END
+ 
+ INITIALISATION op(rec(x:16,y:rec(x:18))) 
+   
+END
+

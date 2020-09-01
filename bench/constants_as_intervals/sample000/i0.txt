@@ -1,0 +1,11 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+CONCRETE_CONSTANTS c1,c2
+
+VALUES c = 3 .. 17;
+       c2 = 45
+      
+
+END
+

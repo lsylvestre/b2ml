@@ -1,0 +1,10 @@
+IMPLEMENTATION i2
+  REFINES m2
+  EXTENDS m1(4,2)
+
+  INITIALISATION 
+      v3 := r.v1;
+     #print_int v2;
+     #print_int r.c
+END
+

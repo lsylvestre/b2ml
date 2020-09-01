@@ -1,0 +1,9 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+  CONCRETE_CONSTANTS c,d
+  VALUES c = (0 .. 8) * {42};
+         d = (0..5)*(0..17)*(0..44)*{56+18/4}
+
+END
+

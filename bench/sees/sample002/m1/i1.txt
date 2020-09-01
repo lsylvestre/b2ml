@@ -1,0 +1,10 @@
+IMPLEMENTATION i1
+  REFINES m1
+  SEES m0
+
+  CONCRETE_VARIABLES v1
+  INITIALISATION
+    v1 := 2;
+    #print_int v1
+END
+

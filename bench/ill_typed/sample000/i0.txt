@@ -1,0 +1,16 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+INITIALISATION
+  #ill_typed (5 + TRUE);
+  #ill_typed (5 - TRUE);
+  #ill_typed (5 * TRUE);
+  #ill_typed (5 / TRUE);
+  #ill_typed (TRUE + TRUE);
+  #ill_typed (TRUE - TRUE);
+  #ill_typed (TRUE * TRUE);
+  #ill_typed (TRUE / TRUE);
+  #ill_typed ( rec(x:5,y:TRUE)'y   +  2);
+  #ill_typed ( rec(x:5,y:rec(a:17))'y   +  2)
+END
+

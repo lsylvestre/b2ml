@@ -1,0 +1,8 @@
+IMPLEMENTATION i1
+  REFINES m1
+  SEES m0
+
+  INITIALISATION
+    #print_int v1
+END
+

@@ -1,0 +1,14 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+  CONCRETE_VARIABLES v
+ INITIALISATION 
+     v := {0 |-> FALSE |-> (3+4),
+           0 |-> TRUE |-> (2+6),
+           1 |-> FALSE |-> (5+7),
+           1 |-> TRUE |-> (3+4)};
+     v(0,TRUE) := 42;
+     #print_int v(0,TRUE)
+
+END
+

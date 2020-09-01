@@ -1,0 +1,9 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+SETS ens = {A,B,C}
+INITIALISATION
+   #print_type A;
+   IF A = B THEN skip END
+END
+

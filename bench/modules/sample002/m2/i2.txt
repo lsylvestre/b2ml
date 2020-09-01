@@ -1,0 +1,8 @@
+IMPLEMENTATION i2
+  REFINES m2
+  EXTENDS r.m0
+  EXTENDS g.m1
+  
+  INITIALISATION #print_int (r.v1 + g.v2) / 2
+END
+

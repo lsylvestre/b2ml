@@ -1,0 +1,15 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+
+CONCRETE_VARIABLES z
+
+OPERATIONS
+  u <-- op1(v) = u := rec(x:5,y:v) ;
+  u <-- op2 = u <-- op1(FALSE)
+
+INITIALISATION 
+  z := rec(x:42,y:TRUE)
+
+END
+

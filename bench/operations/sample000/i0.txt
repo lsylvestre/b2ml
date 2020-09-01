@@ -1,0 +1,16 @@
+IMPLEMENTATION TestOperation
+REFINES M0
+    CONCRETE_VARIABLES x,y
+    OPERATIONS 
+      a,b <-- op (x1,x2) = 
+      BEGIN
+        a := x2 ; 
+        b := x1
+      END
+
+  INITIALISATION
+    x,y <-- op(2,4);
+    #print_int x;
+    #print_int y
+
+END

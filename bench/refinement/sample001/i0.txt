@@ -1,0 +1,18 @@
+IMPLEMENTATION i0
+  REFINES r0bis
+
+CONCRETE_VARIABLES v7
+
+SETS ens = {A,B,C}
+
+INITIALISATION
+   v1 := 1;
+   v2 := TRUE;
+   v3 := rec(a:5);
+  v4 := v3'a;
+  v5 := v4;
+   v6 := 6;
+   v7 := rec(a:5,b:TRUE)
+
+END
+

@@ -1,0 +1,9 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+CONCRETE_CONSTANTS c1,c2
+
+VALUES c1 = 3 .. 17;
+       c2 = (c1) * {42}
+
+END

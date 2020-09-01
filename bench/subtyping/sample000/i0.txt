@@ -1,0 +1,19 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+OPERATIONS
+
+  r <-- op(v) = 
+    BEGIN 
+     r'x := v;
+     #print_type r
+    END
+
+INITIALISATION 
+  VAR r IN 
+    r := rec(x:5,y:TRUE,z:rec(a:5));
+    r <-- op(42);
+    #print_int r'x
+  END
+END
+

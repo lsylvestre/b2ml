@@ -1,0 +1,13 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+INITIALISATION
+  VAR r IN
+    r := rec(x:5,y:rec(x:5,y:{0 |-> 0 |-> FALSE,
+          0 |-> 1 |-> TRUE,
+          1 |-> 0 |-> TRUE,
+          1 |-> 1 |-> TRUE}))
+  END 
+
+END
+

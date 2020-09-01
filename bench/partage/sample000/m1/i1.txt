@@ -1,0 +1,10 @@
+IMPLEMENTATION i1
+  REFINES m1
+  EXTENDS m0
+
+  INITIALISATION 
+    #print_int v;
+    setV
+
+END
+

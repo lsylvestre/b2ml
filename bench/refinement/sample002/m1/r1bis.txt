@@ -1,0 +1,9 @@
+REFINEMENT r1bis
+  REFINES r1
+
+
+SETS ens = {A,B,C}
+
+CONCRETE_VARIABLES w5,w6
+END
+

@@ -1,0 +1,3 @@
+MACHINE M0 
+
+END

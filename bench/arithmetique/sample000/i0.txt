@@ -1,0 +1,15 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+  INITIALISATION 
+    ASSERT (-10 - 5) = ((-10) - 5) THEN skip END;
+    ASSERT (3 * 4 + 100) = ((3 * 4) + 100) THEN skip END;
+    ASSERT (10000 - 2 - 3 - 4) = (((10000 - 2) - 3) - 4) THEN skip END;
+    ASSERT (10000 / 2 / 3 / 4) = (((10000 / 2) / 3) / 4) THEN skip END;
+    ASSERT (10 ** 10) = 10000000000 THEN skip END;
+    ASSERT (5 ** 3 ** 4 ** 2) = (5 ** (3 ** (4 ** 2))) THEN skip END
+
+
+
+END
+

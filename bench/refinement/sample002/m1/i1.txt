@@ -1,0 +1,17 @@
+IMPLEMENTATION i1
+  REFINES r1bis
+
+CONCRETE_VARIABLES foo
+
+
+INITIALISATION
+   w1 := 1;
+   w2 := TRUE;
+   w3 := rec(a:5);
+  w4 := w3'a;
+  w5 := w4;
+   w6 := rec(a:rec(a:5));
+   foo := 17
+
+END
+

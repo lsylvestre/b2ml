@@ -1,0 +1,11 @@
+/* fichier implémentant une fonctionnalité écrit à la main en C */
+
+IMPLEMENTATION measure_i
+REFINES measure
+
+OPERATIONS
+   m1, m2 <-- measure_level = skip;
+
+   m1, m2, m3 <-- measure_consumption = skip
+
+END

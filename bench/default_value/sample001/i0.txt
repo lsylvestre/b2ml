@@ -1,0 +1,13 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+  CONCRETE_VARIABLES v
+
+  INITIALISATION
+    v := TRUE;
+    VAR r IN 
+      r := FALSE
+    END 
+
+END
+

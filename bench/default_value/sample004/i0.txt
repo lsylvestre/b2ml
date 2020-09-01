@@ -1,0 +1,11 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+INITIALISATION
+  VAR r IN
+    r := rec(x:5,y:rec(x:5,y:8))
+  END 
+
+/*OPERATIONS op(u,z) = BEGIN u'x := 6 END*/
+END
+
