@@ -27,7 +27,7 @@ and integer_lit =
   | Min_int
 
 and ident = string
-and ident_ren = ident * ident list option
+and ident_ren = Id_ren of {x:ident;r:ident list}
 
 and unop = Uminus | Succ | Pred
 and binop = Add | Sub | Mul | Div | Mod | Pow
@@ -119,5 +119,7 @@ and header_operation = { return: ident annot list;
 
 let string_of_ident_ren xr = 
   match xr with
-  | x,None -> x
-  | x,Some prefixs -> String.concat "." prefixs ^"."^x
+  | Id_ren {x;r=[]} -> x
+  | Id_ren {x;r} -> String.concat "." r ^ "." ^ x
+
+let x2xr ?(r=[]) x = Id_ren{x;r}

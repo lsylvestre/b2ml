@@ -180,7 +180,7 @@ let rec print_inst ?(paren=false) = function
             (sptf "%s -> %s") (mapcat "| " print_literal cs) (print_inst i)) lp)
       (match others with None -> "()" | Some i -> (print_inst i))
 
-  | Call{op=k;args} -> 
+  | Call{op=k;args} ->       (* print_exp ou print_ctx_exp ?? *)
     parenthesized paren @@
     iter (sptf "update (%s)") (sptf "call (%s)" (mapcat "," (fun e -> print_exp ~paren:true e) args)) k
 

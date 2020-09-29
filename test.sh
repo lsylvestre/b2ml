@@ -57,7 +57,7 @@ $MAKE expect I=bench/subtyping/sample002  EXPECTED=""
 $MAKE expect I=bench/mch_parameters/sample000  M="m0 m1"   EXPECTED="42"
 $MAKE expect I=bench/mch_parameters/sample001  M="m0 m1" EXPECTED="42"
 $MAKE expect I=bench/mch_parameters/sample002  M="m0 m1" EXPECTED="42"
-$MAKE expect I=bench/mch_parameters/sample002  M="m0 m1" EXPECTED="4242" # à discuter
+# $MAKE expect I=bench/mch_parameters/sample003  M="m0 m1" EXPECTED="4242" # à discuter
 
 $MAKE expect I=bench/partage/sample000/  M="m0 m1 m2" EXPECTED="4221"
 $MAKE expect I=bench/partage/sample001/  M="m0 m1 m2" EXPECTED="4221"

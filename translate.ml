@@ -2,14 +2,15 @@ open Names
 
 type name = string
 
-type env = { 
-  record_decls:(name list) list; 
-  (* liste de noms de champs de chaque record *)
+type b_record = name list
+type constructor = name * Ast.ident_ren
 
-  variables:(Ast.ident_ren * Target.vartype) list;
-  constructors:(name * Ast.ident_ren) list;
+type env = { 
+  record_decls:b_record list; 
+  variables: (Ast.ident_ren * Target.vartype) list;
+  constructors: constructor list;
   all_mchs_ren: Ast.ident list; 
-  (* noms et paramètres et machines importées dans la machine courrante *)
+  (* listes des renommages du projet *)
 }
 
 let init_env = {record_decls=[]; (* liste de noms de champs de chaque record *)
@@ -54,7 +55,7 @@ let default_value ~(env : env) ~(ty : Types.t) : Target.exp =
     | Types.Ident {name} -> 
       let c,_ =
         match List.find_opt
-                (fun (_,(name',_)) -> name = name')
+                (fun (_,Ast.Id_ren{x=name'}) -> name = name')
                 env.constructors
         with 
         | None -> assert false 
@@ -73,27 +74,27 @@ let default_value ~(env : env) ~(ty : Types.t) : Target.exp =
     | _ -> assert false (* pas B0 *)
   in value ty
 
-let rec rw_ident_ren ?(loc=Err.default_position) ~env ((x,r) as xr) = 
+let rec rw_ident_ren ?(loc=Err.default_position) ~env (Ast.Id_ren{x;r} as xr) = 
   let x = Names.normalize_ident x in
   match List.assoc_opt xr env.variables with
   | None -> err_unbound_value ~loc xr
   | Some LV | Some Arg_out ->
     (match xr with
-     | (x,None) -> Target.AppUnOp{op=Deref;e=Name{x}}
+     | Ast.Id_ren{x;r=[]} -> Target.AppUnOp{op=Deref;e=Name{x}}
      | _ -> assert false)
   | Some Arg_in -> 
     (match xr with
-     | (x,None) -> Target.Name{x}
+     | Ast.Id_ren{x;r=[]} -> Target.Name{x}
      | _ -> assert false)
   | Some CST ->      
-    (match r with 
-     | Some (m::_) ->
+    (match xr with 
+     | Ast.Id_ren{x;r=[m]} ->
        let module_name = Names.normalize_module_name m in
        OpenModuleIn{module_name;e=Target.Name{x}}
      | _ -> Target.Name{x} )
   | Some GV -> 
-    (match r with
-     | Some (m::_) ->
+    (match xr with
+     | Ast.Id_ren{x;r=[m]} ->
        let module_name = Names.normalize_module_name m in
        Target.AppUnOp{op=Deref;e=OpenModuleIn{module_name;e=Target.Name{x}}}
      | _ -> Target.AppUnOp{op=Deref;e=Name{x}})
@@ -140,7 +141,6 @@ and rw_term ~(env : env) ~(term : Ast.term) : (Target.exp * env) =
   match desc with
   | Ast.Const {k} -> 
     (* 
-       ----------------
        C[k](p) ~> (k,p) *)
     let k = rw_constant ~k in
     let res = Target.Literal {k} in
@@ -150,9 +150,9 @@ and rw_term ~(env : env) ~(term : Ast.term) : (Target.exp * env) =
   (* pour MLIdent, y a t'il besoin d'inspecter le champs constructors 
      de l'env, (etc.) comme on le fait pour Ast.Ident ? *)
   | Ast.Ident {xr} ->
-    let (x,r) = xr in
+    let Id_ren{x;r} = xr in
     let res = (match r with
-        | None when is_constructor x ~env -> 
+        | [] when is_constructor x ~env -> 
           let cons = Names.normalize_capitalized x in
           Target.Literal {k=Variant cons}
         | _ -> rw_ident_ren ~loc ~env xr) in
@@ -194,7 +194,7 @@ and rw_term ~(env : env) ~(term : Ast.term) : (Target.exp * env) =
              match range with
              | Ast.Range_as_set _ -> (Printf.printf "todo\n" ;assert false)
              | Ast.Range_as_ident x -> 
-               let ex = rw_ident_ren ~loc ~env (x,None) in 
+               let ex = rw_ident_ren ~loc ~env (Ast.x2xr x) in 
                let e2= Target.(App{e=Name{x="snd"};args=[ex]}) in
                let f = Target.Fun{x="_";e=acc} in
                let app = Target.App{e=array_init;args=[e2;f]} in
@@ -386,7 +386,7 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
     let variables0 = env.variables in
 
     let env = 
-      let idents = List.map (fun Ast.{y} -> (y,None)) xs in 
+      let idents = List.map (fun Ast.{y} -> Ast.x2xr y) xs in 
       env_extends ~env ~vartype:Target.LV ~idents 
     in
     let e,env = rw_instruction ~env ~inst:i in
@@ -401,20 +401,19 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
 
   | Ast.Assign{xr;a} ->
     let e,env = rw_term ~env ~term:a in
-    let (x,r) = xr in
+    let Id_ren{x;r} = xr in
     let res = match r with
-      | None when is_constructor x ~env -> assert false     
+      | [] when is_constructor x ~env -> assert false     
       | _ -> (match List.assoc_opt xr env.variables,r with
           | None,_ -> err_unbound_value ~loc xr
-          | Some _,None ->
+          | Some _,[] ->
             (* | Some Arg_out,None ->*)
             let x = Names.normalize_ident x in  
             Target.(AppBinOp{op=SetRef;e1=Name{x};e2=e})
-          | Some _,Some(o::_) -> 
+          | Some _,(o::_) -> 
             failwith "pas le droit de modifier une variable\
                      \ d'une autre machine (sans passer par\
-                     \ ses opérations propres)"
-          | _ -> assert false (* à vérifier *) ) in
+                     \ ses opérations propres)") in
     (res,env)
 
   | Ast.Array_assign{xr;idxs;a=new_val} -> 
@@ -493,47 +492,27 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
     let res = Target.Case{e;cases; others} in
     (res,env)
 
-  | Ast.Call ({outs;op;args} as ast) ->  
+  | Ast.Call {outs;op;args} ->  
     (match List.assoc_opt op env.variables with 
-     | Some(Target.OP) -> let es_args,env = rw_terms ~env ~terms:args in 
-       let (f,r) = op in
+     | Some(Target.OP) -> 
+       (let es_args,env = rw_terms ~env ~terms:args in 
+       let Id_ren{x=f;r} = op in
        let f = Names.normalize_ident f in
-       (match outs with 
-        | [] -> let e = match r with 
-            | None -> Target.Name{x=f}
-            | Some (m::_) -> let module_name = Names.normalize_module_name m in 
-              Target.OpenModuleIn{module_name;e=Target.Name{x=f}}
-            | _ -> assert false 
-          in
-          let call = Target.App {e;args=es_args} in
-          (call,env)
-        | _ -> 
-          let vs = List.mapi (fun i _ -> Printf.sprintf "v%d'" i) outs in
-          let sets = List.map2 (fun Ast.{y=xr} v -> 
-              let id = Ast.{loc;desc=Ast.Ident{xr=(v,None)}} in
-              Ast.{loc;desc=Ast.Assign{xr;a=id}}) outs vs 
-          in
-          let call =
-            Ast.{loc;desc=Ast.Call {ast with
-                                    outs=[];
-                                    args=List.map
-                                        (fun x ->
-                                           Ast.{loc;desc=Ast.MLIdent{x}})
-                                        vs@args}}
-          in
-          let body =
-            List.fold_left
-              (fun acc set ->
-                 Ast.{loc;desc=Ast.Seq{i1=acc;i2=set}}) call sets
-          in 
-          let var = Ast.{loc;
-                         desc=Ast.Var {xs=List.map2
-                                           (fun v {y;ty} -> Ast.{y=v;ty})
-                                           vs outs;
-                                       i=body}}
-          in
-          rw_instruction ~env ~inst:var)
-     | Some (_) ->
+       let e = match r with 
+       | [] -> Target.Name{x=f}
+       | m::_ -> let module_name = Names.normalize_module_name m in 
+            Target.OpenModuleIn{module_name;e=Target.Name{x=f}}
+        in
+        let outs_refs = List.map (function Ast.{y=Id_ren{x;r=[m]}} -> 
+                                    let module_name = normalize_module_name m in
+                                    let x = normalize_ident x in
+                                    Target.OpenModuleIn{module_name;e=Target.Name{x}} 
+                                  | Ast.{y=Id_ren{x}} -> 
+                                    let x = normalize_ident x in 
+                                    Target.Name{x}) outs in
+        let call = Target.App {e;args=outs_refs @ es_args} in
+        (call,env))
+     | Some _ ->
        (* en principe, les cas d'erreurs ont été élimiés au typage *)
        Err.error_exit loc (Printf.sprintf "%s : This is not an operation;\
                                           \ it cannot be applied."
@@ -565,22 +544,20 @@ type clause_result = { decls_before:Target.decl list;
 let rw_sees ~(env : env) ~(mchs : Ast.ident_ren list) = 
   (* idem que inclusion (copier coller) *)
   let env = 
-    let variables = List.fold_left (fun variables mchr -> 
-        (match mchr with 
-         | (mch,prefix) ->
+    let variables = List.fold_left (fun variables (Ast.Id_ren{x=mch;r}) -> 
            let ext = List.filter_map (function 
-               | ((x,Some [mch']),y) -> (* Printf.printf "====> %s\n" x; *)
+               | (Ast.Id_ren{x;r=[mch']},y) -> (* Printf.printf "====> %s\n" x; *)
                  if mch = mch' 
-                 then (Some (match prefix with
-                     | None -> ((x,None),y) 
-                     | Some p -> ((x,Some p),y) ))
+                 then (Some (match r with
+                     | [] -> (Ast.x2xr x,y) 
+                     | _ -> (Ast.x2xr ~r x,y) ))
                  else None
                | _ -> None) variables in
-           (ext@variables))) env.variables mchs in
+           (ext@variables)) env.variables mchs in
     { env with variables } in
 
   let module_components = 
-    List.map (function (_,Some(m::_)) | (m,_) -> 
+    List.map (function Ast.Id_ren{r=m::_} | Ast.Id_ren{x=m} -> 
         Target.OpenModule{module_name=Names.normalize_module_name m}) mchs in
   { decls_before=[];
     module_components;
@@ -594,7 +571,7 @@ let rw_sets ~(env : env) ~(component_name : Ast.ident) ~(sets : Ast.set list) =
         | Ast.DefSet{x;enum} -> 
           let m = Names.normalize_ident component_name in
           let type_name = m ^ "_" ^ x in
-          let env = env_add_variant_type_declaration env (x,Some[m]) enum in
+          let env = env_add_variant_type_declaration env (Ast.x2xr ~r:[m] x) enum in
           aux (Target.TyVariantDecl{x=type_name;enum}::acc) env xs) in
   let acc,env = aux [] env sets in
   let res = Target.D_comment{s="sets"}  :: List.rev acc in
@@ -602,11 +579,8 @@ let rw_sets ~(env : env) ~(component_name : Ast.ident) ~(sets : Ast.set list) =
     module_components=[];
     env }
 
-
-
 let rw_inclusions ~(env : env)
     ~(mchs_init : (Ast.ident_ren * Ast.term list) list) = 
-  (* Printf.printf "[DEBUG] Includes\n"; *)
   let mchs,params = List.split mchs_init in 
   let rec aux acc env = function
     | [] -> (List.rev acc, env) 
@@ -616,35 +590,33 @@ let rw_inclusions ~(env : env)
   let mchs = List.combine mchs params in
 
   let env = 
-    let variables = List.fold_left (fun variables (mchr,_) -> 
-        (match mchr with 
-         | (mch,prefix) ->
+    let variables = List.fold_left (fun variables ((Ast.Id_ren{x=mch;r}),_) -> 
            let ext = List.filter_map (function 
-               | ((x,Some [mch']),y) ->
+               | (Ast.Id_ren{x;r=[mch']},y) ->
                  if mch = mch' 
-                 then (Some (match prefix with
-                     | None -> ((x,None),y) 
-                     | Some p -> ((x,Some p),y) ))
+                 then (Some (match r with
+                     | [] -> (Ast.x2xr x,y) 
+                     | _ -> (Ast.x2xr ~r x,y) ))
                  else None
                | _ -> None) variables in
-           (ext@variables))) env.variables mchs_init in
+           (ext@variables)) env.variables mchs_init in
     { env with variables } in
 
   (* inclusion sans renommage = héritage *)
   let mchs_included,mchs_ren =
     List.partition
       (function
-        | ((x,None),_) -> true
+        | (Ast.Id_ren{x;r=[]},_) -> true
         | _ -> false) mchs
   in
 
   let module_components = List.map (fun (xr,parameters) -> 
       match parameters with 
       | [] -> (match xr with
-          | (m,None) -> let module_name = Names.normalize_module_name m in Target.IncludeModule{module_name}
+          | Ast.Id_ren{x=m;r=[]} -> let module_name = Names.normalize_module_name m in Target.IncludeModule{module_name}
           | _ -> assert false)
       | _ -> (match xr with
-          | (m,None) ->
+          | Ast.Id_ren{x=m;r=[]} ->
             let functor_name = "Make"^Names.normalize_module_name m in
             let e = match parameters with 
               | [] -> Target.Literal{k=Unit} 
@@ -658,8 +630,8 @@ let rw_inclusions ~(env : env)
   let decls_before,decl_after = 
     let rec aux decls_before module_components = function
       | [] -> List.rev decls_before, List.rev module_components
-      | ((_,Some (r1::x::_)),parameters)::tl
-      | ((x,Some (r1::_)),parameters)::tl -> 
+      | (Ast.Id_ren{r=(r1::x::_)},parameters)::tl
+      | (Ast.Id_ren{x;r=(r1::_)},parameters)::tl -> 
         let module_name = normalize_module_name r1 in
         let functor_name = "Make" ^ normalize_module_name x in
         let structure = 
@@ -677,7 +649,7 @@ let rw_inclusions ~(env : env)
   in
 
   let env = {env with all_mchs_ren = 
-                        List.map (function ((_,Some(m::_)),_) -> m | _ -> assert false) mchs_ren @ env.all_mchs_ren} in
+                        List.map (function (Ast.Id_ren{r=(m::_)},_) -> m | _ -> assert false) mchs_ren @ env.all_mchs_ren} in
 
 
   let module_components = module_components @ decl_after in
@@ -688,7 +660,7 @@ let rw_inclusions ~(env : env)
 let rw_concrete_variables ~(env : env) ~(xs : Ast.ident_ren Ast.annot list) = 
   let res =
     List.map (function 
-        | Ast.{y=(x,None);ty} ->
+        | Ast.{y=Ast.Id_ren{x;r=[]};ty} ->
           let x = normalize_ident x in
           let default=default_value ~env ~ty in
           Target.Let{p=PVar x;e=App{e=Name{x="ref"};args=[default]}}
@@ -731,20 +703,20 @@ let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
 
       (* ajout des arguments de l'opération à l'environnement *)
       let env_op = 
-        let idents = List.map (fun Ast.{y} -> (y,None)) args in
+        let idents = List.map (fun Ast.{y} -> Ast.x2xr y) args in
         env_extends ~env ~vartype:Target.Arg_in ~idents 
       in 
 
       let env_op = 
-        let idents = List.map (fun Ast.{y} -> (y,None)) outs in
+        let idents = List.map (fun Ast.{y} -> Ast.x2xr y) outs in
         env_extends ~env:env_op ~vartype:Target.Arg_out ~idents 
       in
 
       let e,env_op = rw_instruction env_op i in
 
       let env = env_extends ~env ~vartype:Target.OP ~idents:[name] in
-      let (x,r) = name in  (* que faire avec le renommage de l'op ?? *)
-      assert (r = None);
+      let Ast.Id_ren{x;r} = name in  (* que faire avec le renommage de l'op ?? *)
+      assert (r = []);
       let x = Names.normalize_ident x in
       let args = List.map (fun Ast.{y} -> Target.PVar (normalize_ident y)) args in
       let outs = List.map (fun Ast.{y} -> Target.PVar (normalize_ident y)) outs in
@@ -761,8 +733,6 @@ let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
 
 
 let rw_values ~(env : env) ~(bindings : Ast.bindings) = 
-  (* remarque : ne detecte pas des constantes déclarées 
-     dans la clause concrete_constants mais pas valuées. *)
   let rec aux acc env = function
     | [] -> 
       (List.rev acc,env)
@@ -776,7 +746,7 @@ let rw_values ~(env : env) ~(bindings : Ast.bindings) =
         | Ast.(IntervalValue (AliasInterval _)) ->
           (Printf.printf "todo\n";assert false)
       in
-      let env = env_extends ~env ~vartype:Target.CST ~idents:[(x,None)] in
+      let env = env_extends ~env ~vartype:Target.CST ~idents:[Ast.x2xr x] in
       let x = Names.normalize_ident x in
       let c = Target.Let{p=PVar x;e} in
       aux (c::acc) env xs
@@ -811,7 +781,7 @@ let rw_component ~(env : env) ~(component : Ast.component)
 
     let env =
       env_extends ~env ~vartype:Target.Arg_in
-        ~idents:(List.map (fun Ast.{y} -> (y,None)) parameters)
+        ~idents:(List.map (fun Ast.{y} -> Ast.x2xr y) parameters)
     in
     (* fusion des clauses inclusions de la machine et de son implémentation *)
     let cs = let rec aux mchs_init acc = function
@@ -833,18 +803,18 @@ let rw_component ~(env : env) ~(component : Ast.component)
     let cs = List.filter_map
         (function
           | Ast.{desc=Inclusion{mchs_init}} -> 
-            (let rec aux (((m,non),_) as r) acc mchs_init = 
-               assert (non = None);
+            (let rec aux ((Ast.Id_ren{x;r=non},_) as r) acc mchs_init = 
+               assert (non = []);
                match mchs_init with
                | [] -> r,List.rev acc
-               | (((m',None),_) as r')::tl ->
+               | ((Ast.Id_ren{x=m';r=[]},_) as r')::tl ->
                  if m = m' then aux r' acc tl
                  else aux r (r'::acc) tl
                | r'::tl -> aux r (r'::acc) tl 
              in
              let rec aux2 = function
                | [] -> []
-               | (((m,None),_) as r)::mchs_init -> 
+               | ((Ast.Id_ren{x=m;r=[]},_) as r)::mchs_init -> 
                  let x',t' = aux r [] mchs_init 
                  in x'::aux2 t'
                | x::t -> x::aux2 t in 
@@ -895,7 +865,7 @@ let rw_component ~(env : env) ~(component : Ast.component)
 
     let env = {env with variables=List.map (fun (x,s) -> 
         let x = match x with 
-            (y,None) -> (y,Some [m]) 
+            Ast.Id_ren{x=y;r=[]} -> Ast.x2xr ~r:[m] y
           | _ -> x 
         in (x,s)) env.variables} in
 

@@ -438,7 +438,7 @@ ranges:
   | x=range STAR error { syntax_error ~msg:"" (make_position $loc)}
 
 range:
-    | x=parenthesized(ident_ren) {Range_as_ident (fst x)}
+    | x=parenthesized(ident_ren) { match x with Id_ren{x} -> Range_as_ident x }
     | x=ident_ren error {failwith "il faut parenthéser l'identificateur alias d'intervalle"}
     | r=parenthesized(interval_BO) {Range_as_interval r}
     /*| LCURLY
@@ -467,10 +467,9 @@ integer_set_BO:
     | NAT1{SetNat1}
     | INT {SetInt}
 
-ident_ren: l=separated_nonempty_list(DOT,IDENT) 
+ident_ren: l=separated_nonempty_list(DOT,IDENT)
   { match List.rev l with
    | [] -> assert false
-   | [x] -> (x,None)
-   | x::xs -> let ren = List.rev xs in (x,Some ren) }
+   | x::xs -> let r = List.rev xs in Id_ren {x;r} }
 
    

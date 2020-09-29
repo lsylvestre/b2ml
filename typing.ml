@@ -218,7 +218,7 @@ module Typing = struct
 
     | Block{i} -> typInst envTy i
     | Var{xs;i} -> 
-      let ext = List.map (fun Ast.{y;ty} -> ((y,None),ty)) xs in
+      let ext = List.map (fun Ast.{y;ty} -> (Ast.x2xr y,ty)) xs in
       let _ = typInst (ext @ envTy) i in
       Types.Unit
 
@@ -310,7 +310,7 @@ module Typing = struct
     let tyArgs = List.map (fun Ast.{ty} -> ty) args in
     let tyOut = List.map (fun Ast.{ty} -> ty) outs in
     let envTy = ( List.map2
-                    (fun Ast.{y;ty} v -> ((y,None),ty))
+                    (fun Ast.{y;ty} v -> (Ast.x2xr y,ty))
                     (args @ outs)
                     (tyArgs @ tyOut) ) @ envTy in
     Types.unify ~loc Types.Unit (typInst envTy i);
@@ -321,31 +321,33 @@ module Typing = struct
     List.fold_left (fun envTy Ast.{desc;loc} -> 
         typOperation ~loc envTy desc) envTy ops
 
-  let rec typClauses envTy cs = 
+  let rec typClauses (envTy : contexte) cs = 
     let open Ast in
     List.fold_left (fun envTy Ast.{desc;loc} ->
         match desc with 
         | Ast.Sees{mchs} -> (* attention, la machine ouverte (* vue *) 
                                n'est pas refermée ... *)
           let exts = List.map (fun xr ->
-              let m = match xr with  (_,Some (m::_)) -> m | (m,_) -> m in 
+              let m = match xr with 
+                      | Ast.Id_ren{r=m::_} -> m 
+                      | Ast.Id_ren{x=m} -> m 
+              in 
               List.filter_map
                 (function
-                  | ((x,Some(m'::_)),ty) ->
-                    if m = m' then Some ((x,None),ty) else None 
+                  | (Ast.Id_ren{x;r=m'::_},ty) ->
+                    if m = m' then Some (Ast.Id_ren{x;r=[]},ty) else None 
                   | _ -> None) envTy)
               mchs
           in
           (List.concat exts) @ envTy
         | Ast.Inclusion {mchs_init} -> 
-          List.fold_left (fun envTy ((m,r) as machine_xr,parameters) ->    
-              let ty = typeVar envTy (m,None) loc in  
+          List.fold_left (fun envTy ((Ast.Id_ren {x=m}) as machine_xr,parameters) ->    
+              let ty = typeVar envTy (Ast.Id_ren{x=m;r=[]}) loc in  
               let envTy =
                 match machine_xr with 
-                | m,None -> envTy
-                | m,Some (m'::_) -> 
-                  ((m',None),ty)::envTy
-                | _ -> assert false
+                | Ast.Id_ren{x=m;r=[]} -> envTy
+                | Ast.Id_ren{x=m;r=m'::_} -> 
+                  (Ast.Id_ren{x=m';r=[]},ty)::envTy
               in
 
               Types.unify ~loc ty
@@ -356,16 +358,15 @@ module Typing = struct
 
               let ext = List.filter_map 
                   (function 
-                    | ((x,Some [name']),ty) ->
+                    | (Ast.Id_ren{x;r=[name']},ty) ->
                       (match machine_xr with 
-                       | name,None -> if m = name' 
-                         then Some ((x,None),ty)
+                       | Ast.Id_ren{x=name;r=[]} -> if m = name' 
+                         then Some (Ast.Id_ren{x;r=[]},ty)
                          else None
-                       | _,Some (name::_) -> 
+                       | Ast.Id_ren{r=name::_} -> 
                          if m = name' 
-                         then Some ((x,Some [name]),ty)
-                         else None
-                       | _ -> assert false)
+                         then Some (Ast.Id_ren{x;r=[name]},ty)
+                         else None)
                     | _ -> None) envTy in
               (ext@envTy)) envTy mchs_init
         | Ast.Sets{sets} -> 
@@ -376,7 +377,7 @@ module Typing = struct
                 let ext =
                   List.map
                     (fun cstr ->
-                       ((cstr,None),Types.Ident{name=x}))
+                       ( Ast.Id_ren{x=cstr;r=[]},Types.Ident{name=x}))
                     enum
                 in
                 ext @ envTy)
@@ -394,11 +395,11 @@ module Typing = struct
               match v with 
               | Ast.TermValue a -> 
                 let ty = typTerm envTy a in
-                ((x,None),ty)::envTy
+                (Ast.Id_ren{x;r=[]},ty)::envTy
               | Ast.IntervalValue(Interval(a1,a2)) -> 
                 let ty1 = typTerm envTy a1 in
                 let ty2 = typTerm envTy a2 in
-                ((x,None),Types.Tuple{tys=[ty1;ty2]})::envTy
+                (Ast.Id_ren{x;r=[]},Types.Tuple{tys=[ty1;ty2]})::envTy
               | Ast.IntervalValue (AliasInterval _) ->
                 (Printf.printf "todo";assert false))
             envTy bindings
@@ -412,14 +413,14 @@ module Typing = struct
     match desc with
     | Ast.Component {name;parameters;clauses=cs} ->
       let vars = List.map (fun Ast.{ty} -> ty) parameters in
-      let ext = List.map2 (fun Ast.{y=x} v -> (x,None),v) parameters vars in
+      let ext = List.map2 (fun Ast.{y} v -> Ast.x2xr y,v) parameters vars in
       let envTy = ext @ envTy in
       let envTy = typClauses envTy cs in
       let envTy = List.map (function 
-          | ((x,None),Types.Machine _) as b -> b
-          | ((x,None),ty) -> ((x,Some[name]),ty)
+          | (Ast.Id_ren{x;r=[]},Types.Machine _) as b -> b
+          | (Ast.Id_ren{x;r=[]},ty) -> (Ast.Id_ren{x;r=[name]},ty)
           | b -> b) envTy in
-      ((name,None),Types.Machine{parameters=vars}) :: envTy
+      (Ast.Id_ren{x=name;r=[]},Types.Machine{parameters=vars}) :: envTy
 
   let typComponents cps =
     List.fold_left typComponent [] cps

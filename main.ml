@@ -41,16 +41,14 @@ let load_file ic =
 
 
 let prio_clause = function
-  | Ast.Sees _ -> 0
-  | Ast.Inclusion _ -> 1
-
-  | Ast.Sets _ -> 2
-
-  | Ast.Concrete_constants _ -> 3
-  | Ast.Values _ -> 3
-  | Ast.Concrete_variables _ -> 4
-  | Ast.OperationsB0 _ -> 5
-  | Ast.InitialisationB0 _ -> 6
+  | Ast.Sets _ -> 0
+  | Ast.Concrete_constants _ -> 1
+  | Ast.Values _ -> 2
+  | Ast.Sees _ -> 3
+  | Ast.Inclusion _ -> 4
+  | Ast.Concrete_variables _ -> 5
+  | Ast.OperationsB0 _ -> 6
+  | Ast.InitialisationB0 _ -> 7
   | _ -> 100
 
 let clauses_compare Ast.{desc=c1} Ast.{desc=c2} =
@@ -120,13 +118,12 @@ let merge_components (components : Ast.component list) =
                (get_name machine,get_name refinement')::assocs 
            in
            aux acc assocs (merged_machine::mchs) others_refinements)
-  in
+  in 
   aux [] [] mchs others
 
 
 
 let main ?(runtime=[]) ~dst ~translate () =
-
   let result = ref "" in
 
   (* result := !result ^ "let __alpha__ = Obj.magic 0\n\n"; *)(* hum hum *)

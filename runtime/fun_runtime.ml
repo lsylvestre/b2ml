@@ -8,8 +8,8 @@ module type STACK =
 
     val empty : empty
     val push : 'a -> ((_, _) t as 's0) -> ('a, 's0) t
-    val set_hd : 'a -> (('a, _) t as 's0) -> 's0
-    val set_tl : ((_, _) t as 's0) -> (('a, 's0) t as 's1) -> 's1
+    val update_hd : 'a -> (('a, _) t as 's0) -> 's0
+    val update_tl : ((_, _) t as 's0) -> (('a, 's0) t as 's1) -> 's1
   end
 
 module Stack : STACK = struct
@@ -20,8 +20,8 @@ module Stack : STACK = struct
 
   let empty = ({top=();pop=()} : (nil,nil) t)
   let push top pop = {top;pop}
-  let set_hd top s = {s with top}
-  let set_tl pop s = {s with pop}
+  let update_hd top s = {s with top}
+  let update_tl pop s = {s with pop}
 end
 
 module type STATE = 
@@ -88,7 +88,7 @@ module State : STATE = struct
   module Var : VAR = struct
     type ('a,'scope) var = 'a option
     let ref s = push None s
-    let set v s = set_hd (Some v) s
+    let set v s = update_hd (Some v) s
     let fetch s =
       match s.top with
       | None -> raise Uninitialized
@@ -113,8 +113,8 @@ module State : STATE = struct
 
   let def_operator = push
 
-  let update f s = set_tl (f s.pop) s
-  let call args s = set_tl ((s.top args) s.pop) s
+  let update f s = update_tl (f s.pop) s
+  let call args s = update_tl ((s.top args) s.pop) s
 end
 
 type local

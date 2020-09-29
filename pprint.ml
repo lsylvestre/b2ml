@@ -53,7 +53,8 @@ let print_literal = function
   | Variant name -> name
   | AlphaWitness n -> sptf "(__alpha__ : 'a%d)" n
   | EmptyArray -> "[||]"
-let print_ident_ren (x,_) = x (* TODO !! *)
+let print_ident_ren (Ast.Id_ren{x;r}) = 
+  String.concat "." r ^ "." ^ x
 
 let rec print_exp ?(paren=false) = function
     Literal {k} -> 
@@ -188,11 +189,11 @@ let print_class_component ?(lvl=0) c =
   | Mth{m;local;args;body} ->  let args = match args with [] ->  "" | l -> String.concat " " l ^ " " in
     sptf "method %s%s %s= %s" (if local then "private " else "") m  args (print_exp body)
   | Init{i} -> sptf "initializer %s" (print_exp i)
-  | Inherit{mchs} -> mapcat "\n" (fun ((x,r),es) ->
+  | Inherit{mchs} -> mapcat "\n" (fun (Ast.Id_ren{x;r},es) ->
       let args =  match es with [] ->  "" | l -> mapcat " " (fun e -> print_exp ~paren:true e) l in
       match r with 
-      | None -> sptf "inherit %s %s%s" x args (match es with [] -> "" | _ -> sptf " as %s" x)
-      | Some [y] -> sptf "inherit %s %s as %s" y args x
+      | [] -> sptf "inherit %s %s%s" x args (match es with [] -> "" | _ -> sptf " as %s" x)
+      | [y] -> sptf "inherit %s %s as %s" y args x
       | _ -> failwith "todo renommage multiple") mchs
   | CC_comment{s} -> sptf "(* %s *)" s 
 

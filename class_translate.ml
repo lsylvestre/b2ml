@@ -54,7 +54,7 @@ let default_value ~(env : env) ~(ty : Types.t) : Target.exp =
     | Types.Bool -> Target.(Literal{k=Bool false})
     | Types.String -> Target.(Literal{k=String ""})
     | Types.Ident {name} -> 
-      let c,_ = match List.find_opt (fun (_,(name',_)) -> name = name') env.constructors with 
+      let c,_ = match List.find_opt (fun (_,Ast.Id_ren{x=name'}) -> name = name') env.constructors with 
         | None -> assert false 
         | Some c -> c 
       in 
@@ -83,28 +83,28 @@ let rec rw_ident_ren ?(loc=Err.default_position) ~env xr =
   let xr' = match List.assoc_opt xr env.variables with 
     | None -> (match List.assoc_opt xr env.current_sees,xr with
         | None,xr -> xr
-        | Some m,(x,None) -> (x,Some[m])
-        | Some m,(x,Some l) ->(x,Some (m::l)))
+        | Some m,Ast.Id_ren{x;r=[]} -> Ast.x2xr ~r:[m] x
+        | Some m,Ast.Id_ren{x;r} -> Ast.x2xr ~r:(m::r) x)
     | _ -> xr in 
   match List.assoc_opt xr' env.variables with
   | None -> err_unbound_value ~loc xr
   | Some LV | Some Arg_out ->
     (match xr with
-     | (x,None) ->
+     | Ast.Id_ren{x;r=[]} ->
        let x = Names.normalize_ident x
        in Target.AppUnOp{op=Deref;e=Name{x}}
      | _ -> assert false)
   | Some Arg_in -> 
     (match xr' with
-     | (x,None) ->
+     | Ast.Id_ren{x;r=[]} ->
        let x = Names.normalize_ident x 
        in Target.Name{x}
      | _ -> assert false)
   | Some CST -> (match xr' with 
-      | (x,Some (o::_)) ->
+      | Ast.Id_ren{x;r=o::_} ->
         let m = Names.normalize_ident x in
         AppMth{o;m;args=[]}
-      | (x,_) -> 
+      | Ast.Id_ren{x} -> 
         if List.mem x env.current_constants then
          let x = Names.normalize_ident x in 
         Target.Name{x} else
@@ -112,14 +112,14 @@ let rec rw_ident_ren ?(loc=Err.default_position) ~env xr =
         AppMth{o="self";m;args=[]})
   | Some GV -> 
     (match xr' with 
-     | (x,Some (o::_)) ->
+     | Ast.Id_ren{x;r=o::_} ->
        (*let m = Names.normalize_ident x in
        AppMth{o;m;args=[]}  *)
         let m = Names.normalize_ident x in
        if (List.mem o env.current_inclusions) || List.assoc_opt xr env.current_sees <> None
        then let o = Names.normalize_ident o in AppMth{o;m;args=[]}
        else AppMth{o="self";m;args=[]}
-     | (x,_) ->
+     | Ast.Id_ren{x} ->
        let m = Names.normalize_ident x in
        AppMth{o="self";m;args=[]})
   | Some OP -> assert false
@@ -175,9 +175,9 @@ and rw_term ~(env : env) ~(term : Ast.term) : (Target.exp * env) =
   (* pour MLIdent, y a t'il besoin d'inspecter le champs constructors 
      de l'env, (etc.) comme on le fait pour Ast.Ident ? *)
   | Ast.Ident {xr} ->
-    let (x,r) = xr in
+    let Ast.Id_ren{x;r} = xr in
     let res = (match r with
-        | None when is_constructor x ~env -> 
+        | [] when is_constructor x ~env -> 
           let cons = Names.normalize_capitalized x in
           Target.Literal {k=Variant cons}
         | _ -> rw_ident_ren ~loc ~env xr) in
@@ -219,7 +219,7 @@ and rw_term ~(env : env) ~(term : Ast.term) : (Target.exp * env) =
              match range with
              | Ast.Range_as_set _ -> (Printf.printf "todo\n" ;assert false)
              | Ast.Range_as_ident x -> 
-               let ex = rw_ident_ren ~loc ~env (x,None) in 
+               let ex = rw_ident_ren ~loc ~env (Ast.x2xr x) in 
                let e2= Target.(App{e=Name{x="snd"};args=[ex]}) in
                let f = Target.Fun{x="_";e=acc} in
                let app = Target.App{e=array_init;args=[e2;f]} in
@@ -411,7 +411,7 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
     let variables0 = env.variables in
 
     let env = 
-      let idents = List.map (fun Ast.{y} -> (y,None)) xs in 
+      let idents = List.map (fun Ast.{y} -> Ast.x2xr y) xs in 
       env_extends ~env ~vartype:Target.LV ~idents 
     in
     let e,env = rw_instruction ~env ~inst:i in
@@ -434,24 +434,23 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
 
   | Ast.Assign{xr;a} ->
     let e,env = rw_term ~env ~term:a in
-    let (x,r) = xr in
+    let Ast.Id_ren{x;r} = xr in
     let res = match r with
-      | None when is_constructor x ~env -> assert false     
+      | [] when is_constructor x ~env -> assert false     
       | _ -> (match List.assoc_opt xr env.variables,r with
           | None,_ -> err_unbound_value ~loc xr
-          | Some LV,None
-          | Some Arg_out,None ->
+          | Some LV,[]
+          | Some Arg_out,[] ->
             let x = Names.normalize_ident x in  
             Target.(AppBinOp{op=SetRef;e1=Name{x};e2=e})
           | Some LV,_ 
           | Some Arg_out,_ -> assert false
-          | Some _,None -> let att = Names.normalize_ident x in 
+          | Some _,[] -> let att = Names.normalize_ident x in 
             Target.SetAtt{att;e}
-          | Some _,Some(o::_) -> 
+          | Some _,(o::_) -> 
             failwith "pas le droit de modifier une variable\
                       \ d'une autre machine (sans passer par\
-                      \ ses opérations propres)"
-          | _ -> assert false (* à vérifier *) ) in
+                      \ ses opérations propres)") in
     (res,env)
 
   | Ast.Array_assign{xr;idxs;a=new_val} -> 
@@ -533,12 +532,11 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
   | Ast.Call ({outs;op;args} as ast) ->  
     (match List.assoc_opt op env.variables with 
      | Some(Target.OP) -> let es_args,env = rw_terms ~env ~terms:args in 
-       let (m,r) = op in
+       let Ast.Id_ren{x=m;r} = op in
        (match outs with 
         | [] -> let o = match r with 
-            | None -> "self" 
-            | Some (o::_) -> o 
-            | _ -> assert false 
+            | [] -> "self" 
+            | (o::_) -> o 
           in
           let m = Names.normalize_ident m in
           let o = Names.normalize_ident o in
@@ -547,7 +545,7 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
         | _ -> 
           let vs = List.mapi (fun i _ -> Printf.sprintf "v%d'" i) outs in
           let sets = List.map2 (fun Ast.{y=xr} v -> 
-              let id = Ast.{loc;desc=Ast.Ident{xr=(v,None)}} in
+              let id = Ast.{loc;desc=Ast.Ident{xr=Ast.x2xr v}} in
               Ast.{loc;desc=Ast.Assign{xr;a=id}}) outs vs 
           in
           let call =
@@ -600,11 +598,11 @@ type clause_result = { decls_before:Target.decl list;
 let rw_sees ~(env : env) ~(mchs : Ast.ident_ren list) = 
   let env =
     {env with current_sees=List.fold_left 
-                            (fun sees (m,r) -> 
+                            (fun sees (Ast.Id_ren{x=m;r}) -> 
                                (List.filter_map (fun (xr,_) -> 
                                     (match xr with
-                                     | (x,Some [m']) when m = m' ->
-                                       Some ((x,None),m) 
+                                     | (Ast.Id_ren{x;r=[m']}) when m = m' ->
+                                       Some ((Ast.x2xr x),m) 
                                      | _ -> None)) env.variables) @ sees) [] mchs 
                       } in
   { decls_before=[];
@@ -620,7 +618,7 @@ let rw_sets ~(env : env) ~(component_name : Ast.ident) ~(sets : Ast.set list) =
         | Ast.DefSet{x;enum} -> 
           let m = Names.normalize_ident component_name in
           let type_name = m ^ "_" ^ x in
-          let env = env_add_variant_type_declaration env (x,Some[m]) enum in
+          let env = env_add_variant_type_declaration env (Ast.x2xr ~r:[m] x) enum in
           aux (Target.TyVariantDecl{x=type_name;enum}::acc) env xs) in
   let acc,env = aux [] env sets in
   let res = Target.D_comment{s="sets"}  :: List.rev acc in
@@ -644,29 +642,28 @@ let rw_inclusions ~(env : env)
 
   let env = 
     let variables = List.fold_left (fun variables (mchr,_) -> 
-        (match mchr with 
-         | (mch,prefix) ->
+        let Ast.Id_ren {x=mch;r} = mchr in
            let ext = List.filter_map (function 
-               | ((x,Some [mch']),y) -> (* Printf.printf "====> %s\n" x; *)
+               | (Ast.Id_ren {x;r=[mch']},y) -> (* Printf.printf "====> %s\n" x; *)
                  if mch = mch' 
-                 then (Some (match prefix with
-                     | None -> ((x,None),y) 
-                     | Some p -> ((x,Some p),y) ))
+                 then Some (match r with
+                     | [] -> ((Ast.x2xr x),y) 
+                     | r -> ((Ast.x2xr ~r x),y) )
                  else None
                | _ -> None) variables in
-           (ext@variables))) env.variables mchs_init in
+           (ext@variables)) env.variables mchs_init in
     { env with variables } in
   let env = {env with current_inclusions = 
                        List.map (fun (xr,_) ->
                                    match xr with 
-                                  | (_,Some(m::_)) -> m
-                                  | (m,_) -> m) mchs_init @ env.current_inclusions}
+                                  | Ast.Id_ren{r=m::_} -> m
+                                  | Ast.Id_ren{x=m} -> m) mchs_init @ env.current_inclusions}
   in
   (* inclusion sans renommage = héritage *)
   let mchs_inherit,mchs_ren =
     List.partition
       (function
-        | ((x,None),_) -> true
+        | (Ast.Id_ren{x;r=[]},_) -> true
         | _ -> false) mchs
   in
   let env = {env with current_mchs_ren = mchs_ren @ env.current_mchs_ren} in
@@ -676,7 +673,7 @@ let rw_inclusions ~(env : env)
   let mchs_ren =
     List.map
       (function
-        | ((_,Some (r::_)),p) -> ((r,None),p)
+        | (Ast.Id_ren{r=r1::_},p) -> (Ast.x2xr r1,p)
         | _ -> assert false) mchs_ren
   in
    let res = [Target.Inherit{mchs=mchs_inherit}] in
@@ -695,7 +692,7 @@ let rw_inclusions ~(env : env)
         | _ -> App{e=Name{x=r};args}
       in
       Target.Attribute{x=r;e}) mchs_ren) in*)
-  let res = res @ (List.map (fun ((r,_),_) ->
+  let res = res @ (List.map (fun (Ast.Id_ren{x=r},_) ->
       Target.Mth{m=r;local=false;args=[];body=Name{x=r}}) mchs_ren) in
   let res = Target.CC_comment{s="inclusion"} :: res in
   { decls_before=[];
@@ -706,7 +703,7 @@ let rw_inclusions ~(env : env)
 let rw_concrete_variables ~(env : env) ~(xs : Ast.ident_ren Ast.annot list) = 
   let atts,ms = List.split @@
     List.map (function 
-        | Ast.{y=(x,None);ty} ->
+        | Ast.{y=Ast.Id_ren{x;r=[]};ty} ->
           let x = normalize_ident x in
           let default=default_value ~env ~ty in
           (Target.MutableAttribute{x;default},
@@ -756,20 +753,20 @@ let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
 
       (* ajout des arguments de l'opération à l'environnement *)
       let env_op = 
-        let idents = List.map (fun Ast.{y} -> (y,None)) args in
+        let idents = List.map (fun Ast.{y} -> Ast.x2xr y) args in
         env_extends ~env ~vartype:Target.Arg_in ~idents 
       in 
 
       let env_op = 
-        let idents = List.map (fun Ast.{y} -> (y,None)) outs in
+        let idents = List.map (fun Ast.{y} -> Ast.x2xr y) outs in
         env_extends ~env:env_op ~vartype:Target.Arg_out ~idents 
       in
 
       let i,env_op = rw_instruction env_op i in
 
       let env = env_extends ~env ~vartype:Target.OP ~idents:[name] in
-      let (m,r) = name in  (* que faire avec le renommage de l'op ?? *)
-      assert (r = None);
+      let Ast.Id_ren{x=m;r} = name in  (* que faire avec le renommage de l'op ?? *)
+      assert (r = []);
       let m = normalize_ident m in
       let args = List.map (fun Ast.{y} -> normalize_ident y) args in
       let outs = List.map (fun Ast.{y} -> normalize_ident y) outs in
@@ -802,7 +799,7 @@ let rw_values ~(env : env) ~(bindings : Ast.bindings) =
         | Ast.(IntervalValue (AliasInterval _)) ->
           (Printf.printf "todo\n";assert false)
       in
-      let env = env_extends ~env ~vartype:Target.CST ~idents:[(x,None)] in
+      let env = env_extends ~env ~vartype:Target.CST ~idents:[Ast.x2xr x] in
       let x = Names.normalize_ident x in
       let c = Target.ClassLetIn{x;e} in
       let vv = Target.Mth{m=x;local=false;args=[];body=Name{x}} in
@@ -839,7 +836,7 @@ let rw_component ~(env : env) ~(component : Ast.component)
 
     let env =
       env_extends ~env ~vartype:Target.Arg_in
-        ~idents:(List.map (fun Ast.{y} -> (y,None)) parameters)
+        ~idents:(List.map (fun Ast.{y} -> Ast.x2xr y) parameters)
     in
     (* fusion des clauses inclusions de la machine et de son implémentation *)
     let cs = let rec aux mchs_init acc = function
@@ -862,18 +859,18 @@ let rw_component ~(env : env) ~(component : Ast.component)
     let cs = List.filter_map
         (function
           | Ast.{desc=Inclusion{mchs_init}} -> 
-            (let rec aux (((m,non),_) as r) acc mchs_init = 
-              assert (non = None);
+            (let rec aux ((Ast.Id_ren{x=m;r=non},_) as r) acc mchs_init = 
+              assert (non = []);
               match mchs_init with
               | [] -> r,List.rev acc
-              | (((m',None),_) as r')::tl ->
+              | ((Ast.Id_ren{x=m';r=[]},_) as r')::tl ->
                 if m = m' then aux r' acc tl
                 else aux r (r'::acc) tl
               | r'::tl -> aux r (r'::acc) tl 
              in
              let rec aux2 = function
                | [] -> []
-               | (((m,None),_) as r)::mchs_init -> 
+               | ((Ast.Id_ren{x=m;r=[]},_) as r)::mchs_init -> 
                  let x',t' = aux r [] mchs_init 
                  in x'::aux2 t'
                | x::t -> x::aux2 t in 
@@ -900,8 +897,8 @@ let rw_component ~(env : env) ~(component : Ast.component)
       List.concat @@ 
       List.map 
         (function
-          | ((_,Some (r1::x::_)),_)
-          | ((x,Some (r1::_)),_) -> 
+          | (Ast.Id_ren{r=r1::x::_},_)
+          | (Ast.Id_ren{x;r=r1::_},_) -> 
             let alias = normalize_ident r1 in
             let class_name = normalize_ident x in
             [ Target.ClassAliasDecl{alias;parameters=[];class_name};
@@ -922,11 +919,11 @@ let rw_component ~(env : env) ~(component : Ast.component)
     in
     let decls = ren_decl @ decls_before @ [class_mch;new_mch] in
 
-    let env = {env with variables=List.map (fun (x,s) -> 
-        let x = match x with 
-            (y,None) -> (y,Some [m]) 
-          | _ -> x 
-        in (x,s)) env.variables} in
+    let env = {env with variables=List.map (fun (xr,s) -> 
+        let xr = match xr with 
+                 | Ast.Id_ren{x=y;r=[]} -> Ast.x2xr ~r:[m] y
+                 | _ -> xr 
+        in (xr,s)) env.variables} in
 
     let env = {env with current_sees = []; current_inclusions = []; current_constants = []; current_mchs_ren = []} in
     (decls,env)

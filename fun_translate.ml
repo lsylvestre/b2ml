@@ -125,7 +125,7 @@ and rw_term ~(env : env) ~(term : Ast.term) : (Target.exp * env) =
       Elle sera liée à l'état mémoire courant (cf. Fun_ast.ctx_exp)
     *)
     (match xr with
-    | (x,None) when List.mem x env.constructors ->  (* normalize ident with upercase ! *)
+    |  Ast.Id_ren{x;r=[]} when List.mem x env.constructors ->  (* normalize ident with upercase ! *)
                   (Target.Literal {k=Variant x},env)
     | _ -> let res = rw_ident_ren env xr in 
            (res,env))
@@ -350,7 +350,7 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction) : (Target.inst * e
     let env_size0 = env.env_size in
     let variables0 = env.variables in
     let frame_size = List.length xs in
-    let env = env_extends ~env Target.LV (List.map (fun x -> (x,None)) xs) in
+    let env = env_extends ~env Target.LV (List.map (fun x ->  Ast.Id_ren{x;r=[]}) xs) in
     let i,env = rw_instruction ~env ~inst:i in
     let res = Target.Var {frame_size;i} in
     let env = {env with env_size=env_size0; variables=variables0} in (* restaure *)
@@ -535,7 +535,7 @@ let rw_values env xs pp =
   | [] -> (* let i = match acc with [] -> Target.Skip | [i] -> i | l -> (Target.Seq{is=List.rev l}) in *)
            (List.rev acc,env)
   | (x,Ast.TermValue a)::xs -> let e,env = rw_term ~env ~term:a in 
-                               let env = env_extends ~env Target.CST [(x,None)] in
+                               let env = env_extends ~env Target.CST [Ast.x2xr x] in
                                 let env_size = env.env_size in
                                 let k = env_size-0-1 in
                                 let vv = (k,Target.Exp{e}) (* Target.(Set {k;v=Target.Exp{e};vartype=CST}) *) in
@@ -591,8 +591,8 @@ let rw_clause env m clause =
        let args = List.map (function Ast.{y} -> y) args in (* ignore l'annotation de type *)
        let outs = List.map (function Ast.{y} -> y) outs in (* ignore l'annotation de type *)
        let nb_outs = List.length outs in
-       let env = env_extends ~env Target.Arg_out (List.map (fun x -> (x,None)) outs) in
-       let env_op = env_extends ~env Target.Arg_in (List.map (fun x -> (x,None)) args) in 
+       let env = env_extends ~env Target.Arg_out (List.map Ast.x2xr outs) in
+       let env_op = env_extends ~env Target.Arg_in (List.map Ast.x2xr args) in 
        let i,env_op = rw_instruction ~env:env_op ~inst:i in
        let nb_args = List.length args in
        let i,env_op = let rec aux2 i env_op = function 
@@ -610,14 +610,21 @@ let rw_clause env m clause =
     let res = [Target.Decl {name;c=Target.Operations{ops}}] in
     (res,env) 
   | Inclusion{mchs_init} -> 
-    let variables = List.fold_left (fun variables (xr,parameters) -> match xr with 
-                | (m,Some _) -> failwith "renommage pas supporté"
-                | (m,None) -> let ext = List.filter_map 
-                               (function ((x,Some [m']),vartype) -> if m = m' then Some ((x,None),vartype) else None
-                                | _ -> None) variables in
-                               (ext@variables)) env.variables mchs_init in
+    let variables = List.fold_left (fun variables (xr,parameters) -> 
+      match xr with 
+      | Ast.Id_ren{x=m;r=[]} -> 
+        let ext = List.filter_map 
+                     (function 
+                      | (Ast.Id_ren{x;r=[m']},vartype) -> 
+                            if m = m' then Some (Ast.x2xr x,vartype) else None
+                      | _ -> None) variables in
+        (ext@variables)
+      | Ast.Id_ren{x=m;r=_::_} -> failwith "renommage pas supporté"
+     ) env.variables mchs_init 
+    in
     let env = {env with variables} in
     ([],env)
+
 (*
     si pas de renommage, on s'en sort simplement en modifiant l'environnement :
        include m --> pour tout object v = (m',x), si m = m' alors v := (None,x) 
@@ -634,8 +641,8 @@ let rw_component ~(env : env) ~(component : Ast.component) : (Target.decl list *
     if parameters <> [] then failwith "pas suporté........." else
     (* partage ok d'une machine à l'autre ? ça semble ok *)
     let env = (* rafinement *)
-      let l = List.filter (function ((x,(Some [m'])),s) -> m = m' | _ -> false) env.variables in
-      {env with variables = (List.map (fun ((x,_),s) -> ((x,None),s)) l) @ env.variables} 
+      let l = List.filter (function (Ast.Id_ren{x;r=[m']},s) -> m = m' | _ -> false) env.variables in
+      {env with variables = (List.map (fun (Ast.Id_ren{x},s) -> (Ast.x2xr x,s)) l) @ env.variables} 
     in
 
     let (env,decls) = List.fold_left 
@@ -648,8 +655,8 @@ let rw_component ~(env : env) ~(component : Ast.component) : (Target.decl list *
     List.iter (fun d -> r := !r ^ (Fun_pprint.print_decl d |> Printf.sprintf "%s\n")) ds; *)
     let env = {env with variables=List.map (fun (x,s) -> 
                                               let x = match x with 
-                                                       (y,None) -> (y,Some [m]) 
-                                                      | _ -> x 
+                                                      Ast.Id_ren{x;r=[]} -> Ast.x2xr ~r:[m] x
+                                                      | _ -> x
                                               in (x,s)) env.variables} in
     (decls,env)
 
