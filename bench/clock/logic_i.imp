@@ -1,0 +1,84 @@
+IMPLEMENTATION
+    logic_i
+REFINES
+    logic
+SEES
+    g_types,
+    g_operators,
+    io_constants,
+    lchip_interface,
+    user_ctx,
+    inputs
+
+    // pragma SAFETY_VARS
+CONCRETE_VARIABLES
+    O1,
+    O2,
+    TIME_A, // Time of the latest 
+    STATUS // Clock up or down
+INVARIANT
+    O1 : uint8_t &
+    O2 : uint8_t &
+    TIME_A : uint32_t &
+    STATUS : uint8_t
+INITIALISATION
+    O1 := IO_OFF;
+    O2 := IO_OFF;
+    TIME_A := 0;
+    STATUS := SFALSE
+OPERATIONS
+    user_logic = 
+    BEGIN
+        VAR ltime_, deltat_, ms_tick_cycle, s_tick_cycle, aa IN
+            //ltime_ :( ltime_ : uint32_t );
+            //deltat_ :( deltat_ : uint32_t );
+
+            ltime_ <-- get_ms_tick;
+            deltat_ := sub_uint32(ltime_, TIME_A);
+
+            // pour comparer avec un diff 
+            //ms_tick_cycle :( ms_tick_cycle : uint32_t );
+            //s_tick_cycle :( s_tick_cycle : uint32_t );
+            //aa :( aa : uint32_t );
+
+            ms_tick_cycle <-- get_ms_tick;
+
+            s_tick_cycle := ms_tick_cycle / 1000;
+            aa := s_tick_cycle mod 2;
+
+            O2 := IO_OFF;
+
+            IF aa = 0 THEN
+                O2 := IO_ON
+            END;
+
+            IF DELTA_T <= deltat_ THEN
+                IF STATUS = STRUE THEN
+                    STATUS := SFALSE
+                ELSE
+                    STATUS := STRUE
+                END;
+
+                TIME_A := ltime_
+            END;
+
+            IF STATUS = STRUE THEN
+                O1 := IO_ON
+            ELSE
+                O1 := IO_OFF
+            END;
+
+            O1 := IO_ON
+        END
+    END;
+
+    po <-- get_O1 =
+    BEGIN
+        po := O1
+    END;
+
+    po <-- get_O2 =
+    BEGIN
+        po := O2
+    END
+END

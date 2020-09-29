@@ -1,46 +1,79 @@
+(*****************************************)
+(** B2ML, un traducteur de B vers OCaml **)
+(** ----------------------------------- **)
+(** septembre 2020                      **)
+(** loic.sylvestre@etu.upmc.fr          **)
+(*****************************************)
+
+(* syntaxe abstraite de B0 *)
+
 type 'a loc = {loc:Err.pos; desc:'a} 
+
+type 'a annot = {y:'a; ty:Types.t}
 
 let mkloc loc desc = 
   let loc = Err.make_position loc in 
-  {loc;desc} 
+  {loc;desc}
 
-type term = term_desc loc
-and term_desc = 
-  | Const of {k:const}
-  | Ident of {xr:ident_ren}
-  | Array_access of {xr:ident_ren;idxs:term list}
-  | Record_access of {a:term;x:ident}
-  | Record_create of {assocs:(ident option * term) list}
-  | AppUnOp of {op:unop;a:term}
-  | AppBinOp of {op:binop;a1:term;a2:term}
-  | TermOfCondition of {c:condition}
-  | B_array of {arr:b_array}
-  | MLIdent of {x:ident}
+let mk_annot y = {y;ty=Types.(T_alpha (fresh_variable ()))}  
 
-and const = 
-  | Int of integer_lit
-  | Bool of bool
-  | String of string
-and integer_lit = 
+type ident = string
+type ident_ren = Id_ren of {x:ident;r:ident list}
+
+let string_of_ident_ren xr = 
+  match xr with
+  | Id_ren {x;r=[]} -> x
+  | Id_ren {x;r} ->
+    String.concat "." r ^ "." ^ x
+
+let x2xr ?(r=[]) x =
+  Id_ren {x;r}
+
+type integer_lit = 
   | Num of string 
   | Max_int 
   | Min_int
 
-and ident = string
-and ident_ren = Id_ren of {x:ident;r:ident list}
+type const = 
+  | C_int of integer_lit
+  | C_bool of bool
+  | C_string of string
 
-and unop = Uminus | Succ | Pred
-and binop = Add | Sub | Mul | Div | Mod | Pow
+type unop = Uminus | Succ | Pred
+type binop = Add | Sub | Mul | Div | Mod | Pow
 
-and range = Range_as_ident of ident 
-          | Range_as_interval of interval
-          | Range_as_set of (term list)
+type term = term_desc loc
+and term_desc =
+  (* constante littérale (eg. 3, MAXINT, "foo", TRUE) *)
+  | A_const of {k:const}
+  (* identificateur (eg. x, r.x, r1.r2.x) *)
+  | A_ident of {xr:ident_ren}
+  (* accès à un champ de tableau ou appel de primitive (eg. x(a1,a2,a3).
+     NB: la syntaxe concrète ne permet pas de différencier tableau et primitive. 
+     La distinction est possible après inférence de type :
+     l'identificateur xr est annoté par son type *)
+  | A_app of {xr:ident_ren annot;idxs:term list}
+  (* appel d'opérateur unaire *)
+  | A_app_unop of {op:unop;a:term}
+  (* appel d'opérateur binaire *)
+  | A_app_binop of {op:binop;a1:term;a2:term}
+  (* création d'une valeur enregistrement. 
+     NB : En B, le nom de champ est optionnel. 
+     (C'est un point assez marginal car il n'est pas possible accéder 
+      à un champ au cours du programme si son nom n'est pas donné lors 
+      de la création de la valeur enregistrement) *)
+  | A_Range of {a1:term;a2:term}
+  | A_record_create of {assocs:(ident option * term) list}
+  (* accès à un champ d'enregistrement *)
+  | A_record_access of {a:term;x:ident}
+  (* conversion condition -> term *)
+  | A_of_condition of {c:condition}
+  (* création d'une valeur tableau *)
+  | A_array of {arr:b_array}
 
-and interval = Interval of (term * term)
-             | AliasInterval of {name:set_interval}
-and set_interval = SetInt | SetNat | SetNat1
-and b_array = B_array_ext of {maplets:(term list * term) list}
-            | B_array_init of range list * term
+and b_array =
+  | B_array_ext of {maplets:(term list * term) list}
+  | B_array_init of term list * term
 
 and condition = condition_desc loc
 and condition_desc =
@@ -53,26 +86,47 @@ and comparator = Eq | Neq | Lt | Gt | Le | Ge
 
 type instruction = instruction_desc loc
 and instruction_desc =
-  | Skip
-  | Assign of {xr:ident_ren;a:term} 
-  | Array_assign of {xr:ident_ren;idxs:term list;a:term}
-  | Record_assign of {xr:ident_ren;xs:ident list;a:term}
-  | Block of {i:instruction}
-  | Var of {xs:ident annot list;i:instruction}
-  | Call of {outs:ident_ren annot list;op:ident_ren;args:term list}
-  | Seq of {i1:instruction;i2:instruction}
-  | If of {c0:condition;i0:instruction;cases:(condition * instruction) list;others:instruction option}
-  | Case of {a:term;cases:(const list * instruction) list;others:instruction option}
-  | Assert of {c:condition;i:instruction}
-  | While of {c:condition;i:instruction}
-
-  | Print_int of {a:term} (* pour le debug *)
-  | Print_type of {a:term}
-  | Ill_typed of {a:term}
-
-and 'a annot = {y:'a;ty:Types.t}
-
-let mk_annot y = {y;ty=Types.(Alpha (fresh_variable ()))}  
+  (* instruction "ne rien faire" *)
+  | I_skip
+  (* séquence *)
+  | I_seq of {i1:instruction;
+              i2:instruction}
+  (* affectation *)
+  | I_assign of {xr:ident_ren;
+                 a:term} 
+  (* affectation dans un tableau *)
+  | I_array_assign of {xr:ident_ren;
+                       idxs:term list;
+                       a:term}
+  (* affectation d'un champ d'enregistrement *)
+  | I_record_assign of {xr:ident_ren;
+                        xs:ident list;
+                        a:term}
+  (* déclaration de variable locale *)
+  | I_var of {xs:ident annot list;
+              i:instruction}
+  (* appel d'opération *)
+  | I_call of {outs:ident_ren annot list;
+               op:ident_ren;
+               args:term list}
+  (* conditionnelle *)
+  | I_if of {c0:condition;
+             i0:instruction;
+             cases:(condition * instruction) list;
+             others:instruction option}
+  | I_case of {a:term;
+               cases:(const list * instruction) list;
+               others:instruction option}
+  (* assertion *)
+  | I_assert of {c:condition;
+                 i:instruction}
+  (* boucle tant-que *)
+  | I_while of {c:condition;
+                i:instruction}
+  (* pour debug *)
+  | Debug_print_int of {a:term}
+  | Debug_print_type of {a:term}
+  | Debug_ill_typed of {a:term}
 
 type set = 
   | SetIdent of {x:ident}
@@ -80,6 +134,7 @@ type set =
 
 type bindings_ty = (ident * Types.t) list
 
+type ('a,'b) either = Left of 'a | Right of 'b
 type component = component_desc loc
 and component_desc = 
   | Component of {name:ident;
@@ -90,7 +145,6 @@ and component_type =
   | Abstract_machine 
   | Refinement of {component_name:ident} 
   | Implementation of {component_name:ident}
-
 
 and clause = clause_desc loc
 and clause_desc = 
@@ -107,9 +161,9 @@ and clause_desc =
   | InitialisationB0 of {i:instruction}
   | OperationsB0 of {ops:operationB0 loc list;local:bool}
 
+and envTy = (ident_ren*Types.t) list loc
 and bindings = (ident * value) list
-and value = TermValue of term
-          | IntervalValue of interval
+and value = term
 
 and operationB0 = {h:header_operation;i:instruction}
 
@@ -117,9 +171,7 @@ and header_operation = { return: ident annot list;
                          name: ident_ren;
                          args: ident annot list }
 
-let string_of_ident_ren xr = 
-  match xr with
-  | Id_ren {x;r=[]} -> x
-  | Id_ren {x;r} -> String.concat "." r ^ "." ^ x
+and component_or_envTy = (component,envTy) either
 
-let x2xr ?(r=[]) x = Id_ren{x;r}
+let initEnvTy = ref ([] : (ident_ren * Types.t) list)
+let initMchs = ref ([] : ident list)

@@ -1,4 +1,0 @@
--- lors de la fusion d'une machine avec ses raffinements et son implémentation,
-il faudrait supprimer les clauses redondantes. Par exemple, deux occurrences d'une même clause SEES (l'une dans la machine et l'autre dans l'implémentation).
-
--- les paramètres de machines devrait pouvoir être aussi de types records, mais actuellement, la fonction print_ty dans pprint.ml n'implémente pas l'impression des records (la difficulté étant qu'un type record struct(x:t1,y:struct(a:t2)) doit être "applati" en plusieurs déclarations de types. 

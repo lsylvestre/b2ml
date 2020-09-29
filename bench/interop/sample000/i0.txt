@@ -1,0 +1,8 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+  INITIALISATION 
+    r.print_string (r.read("tmp/text.txt"))
+
+END
+

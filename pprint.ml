@@ -1,3 +1,13 @@
+(*****************************************)
+(** B2ML, un traducteur de B vers OCaml **)
+(** ----------------------------------- **)
+(** septembre 2020                      **)
+(** loic.sylvestre@etu.upmc.fr          **)
+(*****************************************)
+
+(* prety-printer, produit un source OCaml *)
+
+
 open Target
 
 let sptf = Printf.sprintf
@@ -46,87 +56,82 @@ let rec iter f x = function
 (* .... *)
 
 let print_literal = function
-  | Unit -> "()"
-  | Int n -> n
-  | Bool b -> if b then "true" else "false" 
-  | String s -> sptf "\"%s\"" s
-  | Variant name -> name
-  | AlphaWitness n -> sptf "(__alpha__ : 'a%d)" n
-  | EmptyArray -> "[||]"
+  | ML_C_unit -> "()"
+  | ML_C_int n -> n
+  | ML_C_bool b -> if b then "true" else "false" 
+  | ML_C_string s -> sptf "\"%s\"" s
+  | ML_C_variant name -> name
+  | ML_C_alpha n -> sptf "(__alpha__ : 'a%d)" n
+  | ML_C_empty_array -> "[||]"
+  | ML_C_name x -> x
+  | ML_C_poly -> "(Obj.magic (Some 0))"
 let print_ident_ren (Ast.Id_ren{x;r}) = 
   String.concat "." r ^ "." ^ x
 
 let rec print_exp ?(paren=false) = function
-    Literal {k} -> 
+    ML_E_literal {k} -> 
     print_literal k
 
-  | Nuplet {es} -> 
+  | ML_E_tuple {es} -> 
     parenthesized paren @@ mapcat "," print_exp es
 
-  | AppBinOp {op;e1;e2} -> 
+  | ML_E_app_binop {op;e1;e2} -> 
     parenthesized paren @@
     sptf "%s %s %s"    
       (print_exp ~paren:true e1) 
       (print_binop op) 
       (print_exp ~paren:true e2)
 
-  | AppUnOp {op;e} -> 
+  | ML_E_app_unop {op;e} -> 
     parenthesized paren @@
     sptf "%s %s" 
       (print_unop op)
       (print_exp ~paren:true e)
 
-  | App {e;args} -> (* assert (List.length args > 0); *)
+  | ML_E_app {e;args} ->
     parenthesized paren @@ 
-    sptf "%s %s" (print_exp ~paren:true e) (match args with [] -> "()" | _ -> mapcat " " (fun e -> print_exp ~paren:true e) args)
-  | Fun{x;e} -> parenthesized paren @@ sptf "fun %s -> %s" x (print_exp e)
-  | LetIn {x:name;e1:exp;e2:exp} -> 
+    sptf "%s %s" (print_exp ~paren:true e) 
+    (match args with 
+     | [] -> "()" 
+     | _ -> mapcat " " (fun e -> print_exp ~paren:true e) args)
+  | ML_E_fun{x;e} -> parenthesized paren @@ sptf "fun %s -> %s" x (print_exp e)
+  | ML_E_let_in {x:name;e1:exp;e2:exp} -> 
     parenthesized paren @@ 
     sptf "let %s = %s in\n%s" x (print_exp e1) (print_exp e2)
-  | Name{x} -> x
-  | OpenModuleIn{module_name;e} -> sptf "%s.%s" module_name (print_exp ~paren:true e)
-  | AppMth{o;m;args} -> (match args with 
-        [] -> sptf "%s#%s" o m 
-      | l -> parenthesized paren @@ 
-        sptf "%s#%s %s" o m (mapcat " " (fun e -> print_exp ~paren:true e) args))
-  | SetAtt{att;e} -> parenthesized paren @@ 
-    sptf "%s <- %s" att (print_exp e)
-
-  | Record {assocs} -> 
+  | ML_E_name{x} -> x
+  | ML_E_open_module_in{module_name;e} -> sptf "%s.%s" module_name (print_exp ~paren:true e)
+  
+  | ML_E_record {assocs} -> 
     sptf "{%s}" @@ 
     mapcat ";" (fun (field,e) -> sptf "%s=%s" field (print_exp e)) assocs
 
-  | GetField {e;x} -> 
+  | ML_E_get_field {e;x} -> 
     sptf "%s.%s" (print_exp ~paren:true e) x
 
-  | SetField {e;xs;v} -> 
+  | ML_E_set_field {e;xs;v} -> 
     sptf "%s.%s <- %s" (print_exp ~paren:true e) (String.concat "." xs) (print_exp v)
 
-  | ArrayCreate {es} -> "[|" ^ mapcat ";" print_exp es ^"|]"
-  | Array_access{e;k} -> sptf "%s.(%s)" (print_exp ~paren:true e) (print_exp k)
-  | Skip -> "()"
-  | Block {e} -> print_exp ~paren:true e
-  | Seq{es} -> 
+  | ML_E_array_create {es} -> "[|" ^ mapcat ";" print_exp es ^"|]"
+  | ML_E_array_access{e;k} -> sptf "%s.(%s)" (print_exp ~paren:true e) (print_exp k)
+  | ML_E_skip -> "()"
+  | ML_E_seq{es} -> 
     parenthesized paren @@ 
-    (* (match is with 
-       | [] | [_] -> assert false
-       | _ ->  *)
     mapcat ";\n" (fun e -> print_exp e) es
 
-  | If{c;e1;e2} -> 
+  | ML_E_if{c;e1;e2} -> 
     parenthesized paren @@ 
     sptf "if %s then %s\nelse %s" 
       (print_exp ~paren:true c) 
       (print_exp ~paren:true e1) 
       (print_exp ~paren:true e2)
 
-  | While{c;e} -> 
+  | ML_E_while{c;e} -> 
     parenthesized paren @@ 
     sptf "while %s do %s done" 
       (print_exp ~paren:true c) 
       (print_exp ~paren:true e)
 
-  | Var{vars;e} -> 
+  | ML_E_var{vars;e} -> 
     (match vars with 
      | [] -> print_exp  ~paren:paren e
      | _ ->
@@ -135,37 +140,39 @@ let rec print_exp ?(paren=false) = function
            sptf "%s = ref %s" x (print_exp ~paren:true v)) vars)
          (print_exp e))
 
-  | Assign{xr;v;vartype} ->
+  | ML_E_assign{xr;v;vartype} ->
     (match vartype with 
-     | LV -> sptf "%s := %s"
+     | Var -> sptf "%s := %s"
      | _ -> sptf "%s <- %s") (print_ident_ren xr)  (print_exp v)
 
-  | Array_assign{e;es;v} -> 
+  | ML_E_array_assign{e;es;v} -> 
     parenthesized paren @@
     sptf "%s.(%s) <- %s" (print_exp ~paren:true e) (mapcat ").(" print_exp es) (print_exp v)
 
-  | Assert {c;e} -> 
+  | ML_E_assert {c;e} -> 
     parenthesized paren @@
     sptf "assert %s; %s"
       (print_exp ~paren:true c) 
       (print_exp ~paren:true e)
 
-  | Case{e;cases=lp;others} -> 
+  | ML_E_match{e;cases=lp;others} -> 
+    let print_literal_when {k;w} =
+    print_literal k ^ (
+      match w with 
+      | None -> ""
+      | Some e -> " when " ^ print_exp e) in
     parenthesized paren @@
     sptf "match %s with\n| %s\n| _ -> %s" (print_exp e)
       (mapcat "\n| "
          (fun (cs,i) ->
-            (sptf "%s -> %s")  (mapcat "| " print_literal cs) (print_exp i)) lp)
+            (sptf "%s -> %s")  (mapcat "| " print_literal_when cs) (print_exp i)) lp)
       (match others with None -> "()" | Some i -> (print_exp i))
 
-  | New{class_name} -> parenthesized paren ("new " ^ class_name)
-  | Print_int{e} -> 
+  | ML_E_print_int{e} -> 
     parenthesized paren @@ 
     sptf "print_int %s" (print_exp ~paren:true e)
 
 (* clause *)
-
-(*   let state_eta_expansion = sptf "fun s -> %s s"  ................ *)
 
 let print_clause ?(paren=false) = function
 
@@ -181,47 +188,31 @@ let print_clause ?(paren=false) = function
 
   | Operations{ops} -> failwith "print values todo"
 
-let print_class_component ?(lvl=0) c = 
-  indent lvl @@
-  match c with
-  | MutableAttribute{x;default} -> sptf "val mutable %s = %s" x (print_exp default)
-  | Attribute{x;e} -> sptf "val %s = %s" x (print_exp e)
-  | Mth{m;local;args;body} ->  let args = match args with [] ->  "" | l -> String.concat " " l ^ " " in
-    sptf "method %s%s %s= %s" (if local then "private " else "") m  args (print_exp body)
-  | Init{i} -> sptf "initializer %s" (print_exp i)
-  | Inherit{mchs} -> mapcat "\n" (fun (Ast.Id_ren{x;r},es) ->
-      let args =  match es with [] ->  "" | l -> mapcat " " (fun e -> print_exp ~paren:true e) l in
-      match r with 
-      | [] -> sptf "inherit %s %s%s" x args (match es with [] -> "" | _ -> sptf " as %s" x)
-      | [y] -> sptf "inherit %s %s as %s" y args x
-      | _ -> failwith "todo renommage multiple") mchs
-  | CC_comment{s} -> sptf "(* %s *)" s 
-
-
 let rec print_ty ty =
 
   let open Types in
   (match ty with
-   | Int -> "int"
-   | Bool -> "bool"
-   | String -> "string"
-   |Ident{name} -> name
-   | Tuple{tys} -> if tys = [] then "unit" else mapcat " * " print_ty tys
-   | Pow{ty} -> failwith "print_ty todo"
-   | Struct {contents={fields}} -> mapcat " ; " (fun (x,ty) -> sptf "%s : %s" x (print_ty ty)) fields
-   | Alpha v -> print_vartype ~prefix:"'a" !v 
-   | Operation _ -> failwith "print_ty todo"
-   | Unit | Machine _ -> assert false
+   | T_int -> "int"
+   | T_bool -> "bool"
+   | T_string -> "string"
+   | T_range -> "(int * int)"
+   | T_ident{name} -> name
+   | T_tuple{tys} -> if tys = [] then "unit" else mapcat " * " print_ty tys
+   | T_pow{ty} -> failwith "print_ty todo"
+   | T_struct {contents={fields}} -> 
+     mapcat " ; " (fun (x,ty) -> sptf "%s : %s" x (print_ty ty)) fields
+   | T_alpha v -> print_vartype ~prefix:"'a" !v 
+   | T_operation {tyOut;tyArgs} -> 
+     mapcat "ref -> " print_ty tyOut ^ " ref -> " 
+     ^ mapcat " -> " print_ty tyArgs ^ " -> unit"
+   | T_arrow {tyArgs;ty} -> 
+     mapcat " -> " print_ty tyArgs ^ " -> " ^ print_ty ty
+   | T_unit 
+   | T_machine _ -> assert false
   )
   and print_vartype ~prefix = function
   |  Types.Unknown n -> prefix ^ string_of_int n
   | Types.Instanciated t -> print_ty t
-
-let print_class_local_decl ?(lvl=0) d =
-  indent lvl @@ 
-  match d with
-  | CLD_comment{s} -> sptf "(* %s *)" s 
-  | ClassLetIn{x;e} -> sptf "let %s = %s in" x (print_exp e)
 
 let rec print_decl ?(lvl=0) d =
   indent lvl @@
@@ -231,20 +222,7 @@ let rec print_decl ?(lvl=0) d =
   | Let{p;e} -> sptf "let %s = %s" (print_patern p) (print_exp e)
   | VoidExp{e} -> sptf "let () = %s" (print_exp e)
   | LetFun{x;args;e} -> sptf "let %s %s = %s" x (mapcat " " print_patern args) (print_exp e)
-  | ClassDecl{class_name;parameters;class_local_decls;class_components} ->
-    (let r = ref "" in
-     r := !r ^ (sptf "class %s %s=\n%s" 
-                  class_name (match parameters with 
-                      | [] -> "" 
-                      | args -> (mapcat " " (fun Ast.{y;ty} -> sptf "(%s : %s)" y (print_ty ty)) args) ^ " ") 
-                  (mapcat "" (fun d -> sptf "%s\n" @@ print_class_local_decl ~lvl:(lvl+1) d) class_local_decls));
-     r := !r ^ (indent (lvl+1) "object (self)\n"); 
-     List.iter (fun c -> r := !r ^ (print_class_component ~lvl:(lvl+2) c |> Printf.sprintf "%s\n")) class_components;
-     r := !r ^ "  end";
-     !r)
-  | ClassAliasDecl{alias;parameters;class_name} ->
-    sptf "class %s %s= %s" alias (match parameters with [] -> "" | l -> (String.concat " " l) ^ " ") class_name
-
+ 
   | TyRecordDecl {bound_variables;name;fields} -> 
     (match fields with 
      | [] -> "()" 
@@ -254,7 +232,7 @@ let rec print_decl ?(lvl=0) d =
          | [x] -> false
          | xs -> true in
        let pre = parenthesized  pre_paren @@ 
-         mapcat "," (fun n -> print_ty Types.(Alpha n)) bound_variables in
+         mapcat "," (fun n -> print_ty Types.(T_alpha n)) bound_variables in
        let body = 
          let string_of_field (RecordField{x;ty;mutability}) =
            let mutable_flag = if mutability then "mutable " else "" in

@@ -1,19 +1,29 @@
+(*****************************************)
+(** B2ML, un traducteur de B vers OCaml **)
+(** ----------------------------------- **)
+(** septembre 2020                      **)
+(** loic.sylvestre@etu.upmc.fr          **)
+(*****************************************)
+
+(* syntaxe abstraite d'un sous-ensemble d'OCaml *)
 
 type name = string
 
-type vartype = GV | LV | CST | OP | Arg_in | Arg_out
+type vartype = Var | Cst
 
 (** une expression est un calcul "pure" qui retourne une valeur *)
 
 type const = 
-  | Unit
-  | Int of string 
-  | Bool of bool 
-  | String of string
-  | Variant of string
-  | EmptyArray
-  | AlphaWitness of int 
-
+  | ML_C_unit
+  | ML_C_int of string 
+  | ML_C_bool of bool 
+  | ML_C_string of string
+  | ML_C_variant of string
+  | ML_C_empty_array
+  | ML_C_alpha of int
+  | ML_C_name of string (* eg. max_int *)
+  | ML_C_poly
+  
 and binop = Add | Sub | Mul | Div | Pow | And 
           | Or | Mod | Eq | Neq | Le | Ge | Lt | Gt
           | SetRef
@@ -22,51 +32,47 @@ and unop = Neg | Succ | Pred | Not | Deref
 
 and exp = 
   (* constante litterale *)
-    Literal of {k:const}
+    ML_E_literal of {k:const}
   (* construit un n-uplet (e1,e2,e3) *)
-  | Nuplet of {es:exp list}
+  | ML_E_tuple of {es:exp list}
   (* applique l'opérateur binaire [op] aux expressions [e1] et [e2] *)
-  | AppBinOp of {op:binop;e1:exp;e2:exp}
+  | ML_E_app_binop of {op:binop;e1:exp;e2:exp}
   (* applique l'opérateur unaire [op] à l'expression [e] *)
-  | AppUnOp of {op:unop;e:exp}
+  | ML_E_app_unop of {op:unop;e:exp}
 
-  | App of {e:exp;args:exp list}
+  | ML_E_app of {e:exp;args:exp list}
 
-  | AppMth of {o:name;m:name;args:exp list}
-  | SetAtt of {att:name;e:exp}
-  
-  | Fun of {x:name;e:exp}
-  | LetIn of {x:name;e1:exp;e2:exp}
-  | Name of {x:name}
-  | OpenModuleIn of {module_name:name;e:exp}
+  | ML_E_fun of {x:name;e:exp}
+  | ML_E_let_in of {x:name;e1:exp;e2:exp}
+  | ML_E_name of {x:name}
+  | ML_E_open_module_in of {module_name:name;e:exp}
   (* construit un record {x1=v1;x2=v2;...} *)
-  | Record of {assocs:(name * exp) list}
+  | ML_E_record of {assocs:(name * exp) list}
   (* accède au champs [x] du record [e] *)
-  | GetField of {e:exp;x:name}
+  | ML_E_get_field of {e:exp;x:name}
   (* .........; du record [e] avec champs [x] vallant [v] *)
-  | SetField of {e:exp;xs:name list;v:exp}
-  | ArrayCreate of {es:exp list}
-  | Array_access of {e:exp;k:exp}
-  | Skip
-  | Block of {e:exp}
+  | ML_E_set_field of {e:exp;xs:name list;v:exp}
+  | ML_E_array_create of {es:exp list}
+  | ML_E_array_access of {e:exp;k:exp}
+  | ML_E_skip
   (* sequence *)
-  | Seq of {es:exp list}
+  | ML_E_seq of {es:exp list}
   (* alternative *)
-  | If of {c:exp;e1:exp;e2:exp}
+  | ML_E_if of {c:exp;e1:exp;e2:exp}
   (* boucle *)
-  | While of {c:exp;e:exp}
+  | ML_E_while of {c:exp;e:exp}
   (* déclaration de variables locales *)
-  | Var of {vars:(name * exp) list;e:exp}
+  | ML_E_var of {vars:(name * exp) list;e:exp}
   (* assigne la valeur [v] à la [k]-ième des [nb_gv] variables globales *)
-  | Assign of {xr:Ast.ident_ren;v:exp;vartype:vartype}
-  | Array_assign of {xr:Ast.ident_ren;e:exp; es:exp list; v:exp}
+  | ML_E_assign of {xr:Ast.ident_ren;v:exp;vartype:vartype}
+  | ML_E_array_assign of {xr:Ast.ident_ren;e:exp; es:exp list; v:exp}
 
-  | Case of {e:exp;cases:(const list * exp) list;others:exp option}
+  | ML_E_match of {e:exp;cases:(const_when list * exp) list;others:exp option}
 
-  | Assert of {c:exp;e:exp}
-  | New of {class_name:name}
-  | Print_int of {e:exp}
+  | ML_E_assert of {c:exp;e:exp}
+  | ML_E_print_int of {e:exp}
 
+and const_when = {k:const;w:exp option}
 and valuation = Valuation of {k:int;e:exp}
 
 type set = {x:name;enum:name list}
@@ -83,10 +89,6 @@ type clause =
 
 and operation = {op:name;args:name list;outs:name list;i:exp}
 
-type class_local_decl = 
-| CLD_comment of {s:string}
-| ClassLetIn of {x:name;e:exp}
-
 type decl = 
   | D_comment of {s:string}
   | TyVariantDecl of {x:name;enum:name list}
@@ -96,11 +98,6 @@ type decl =
   | Let of {p:patern;e:exp}
   | VoidExp of {e:exp}
   | LetFun of {x:name;args:patern list;e:exp}
-  | ClassDecl of {class_name:name;
-                  parameters:name Ast.annot list;
-                  class_local_decls:class_local_decl list;
-                  class_components:class_component list}
-  | ClassAliasDecl of {alias:name;parameters:name list;class_name:name}
   | ModuleDecl of {module_name:name;structure: structure}
   | ModuleAliasDecl of {alias:name;module_name:name}
   | FunctorDecl of {functor_name:name;parameters:(name * signature) list;structure:structure}
@@ -118,11 +115,3 @@ and letfun = {x:name;args:name list;e:exp}
 and ty_record_field = RecordField of {x:name;ty:Types.t;mutability:bool}
 
 and module_component = decl
-
-and class_component = 
-  | Attribute of {x:name;e:exp}
-  | MutableAttribute of {x:name;default:exp}
-  | Mth of {m:name;local:bool;args:name list;body:exp}
-  | Init of {i:exp}
-  | Inherit of {mchs:(Ast.ident_ren * exp list) list}
-  | CC_comment of {s:string}

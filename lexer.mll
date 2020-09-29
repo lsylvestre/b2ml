@@ -1,3 +1,12 @@
+(*****************************************)
+(** B2ML, un traducteur de B vers OCaml **)
+(** ----------------------------------- **)
+(** septembre 2020                      **)
+(** loic.sylvestre@etu.upmc.fr          **)
+(*****************************************)
+
+(* analyse lexicale *)
+
 { 
 open Err
 open Parser
@@ -8,7 +17,7 @@ let () =
     [
         ( "ASSERT", ASSERT);
         ( "BEGIN", BEGIN);
-        ( "BOOL", BOOL);
+        (* ( "BOOL", BOOL); *)
         ( "CASE", CASE);
         ( "CONCRETE_CONSTANTS", CONCRETE_CONSTANTS);
         ( "CONCRETE_VARIABLES", CONCRETE_VARIABLES);
@@ -21,44 +30,33 @@ let () =
         ( "EXTENDS", EXTENDS);
         ( "FALSE", FALSE);
         ( "IF", IF);
-        ( "INVARIANT", INVARIANT);
         ( "IMPLEMENTATION", IMPLEMENTATION);
         ( "IMPORTS", IMPORTS);
         ( "IN", IN);
         ( "INCLUDES", INCLUDES);
         ( "INITIALISATION", INITIALISATION);
         ( "INT", INT);
-        ( "INTEGER", INTEGER);
         ( "LOCAL_OPERATIONS", LOCAL_OPERATIONS);
         ( "MACHINE", MACHINE);
         ( "MAXINT", MAXINT);
         ( "MININT", MININT);
         ( "NAT", NAT);
         ( "NAT1", NAT1);
-        ( "NATURAL", NATURAL);
-        ( "NATURAL1", NATURAL1);
         ( "OF", OF);
         ( "OPERATIONS", OPERATIONS);
         ( "OR", OR);
         ( "POW", POW);
-        ( "POW1", POW1);
         ( "PROMOTES", PROMOTES);
-        ( "PROPERTIES", PROPERTIES);
         ( "REFINES", REFINES);
         ( "REFINEMENT", REFINEMENT);
         ( "SEES", SEES);
-        ( "SELECT", SELECT);
         ( "SETS", SETS);
-        ( "STRING", STRING);
         ( "THEN", THEN);
         ( "TRUE", TRUE);
         ( "USES", USES);
         ( "VALUES", VALUES);
         ( "VAR", VAR);
         ( "VARIANT", VARIANT);
-        ( "VARIABLES", VARIABLES);
-        ( "WHEN", WHEN);
-        ( "WHERE", WHERE);
         ( "WHILE", WHILE);
         ( "bool", Bool);
         ( "mod", Mod);
@@ -69,6 +67,10 @@ let () =
         ( "skip", Skip);
         ( "struct", Struct);
         ( "succ", Succ);
+        ( "EXTERNAL", EXTERNAL);
+        ( "BOOL",T_BOOL);
+        ( "STRING", T_STRING);
+        ( "OPERATION",T_OPERATION); 
     ]
 }
 
@@ -91,6 +93,7 @@ rule token = parse
 | '+'    { PLUS }
 | ','    { COMMA }     
 | '-'    { MINUS }
+| "-->"   { MINUS_MINUS_GT }
 | '.'    { DOT }
 | ".."   { DOT_DOT }
 | '/'    { SLASH }
@@ -105,23 +108,19 @@ rule token = parse
 (* | "=="   { EQ_EQ } *)
 | ">"    { GT }
 | ">="   { GT_EQ }
-| "["    { LBRACKET }
-| "[]"   { LBRACKET_RBREACK }
-| "]"    { RBRACKET }
 | "{"    { LCURLY }
-| "{}"   { LCURLY_RCURLY }
-| "|"    { PIPE }
+(* | "{}"   { LCURLY_RCURLY } *)
 | "|->"  { PIPE_MINUS_GT }
-| "||"   { PIPE_PIPE }
 | "}"    { RCURLY }
 
 (* Constantes numériques *)
 
-| ['-']?['0'-'9']+ as lxm  { NUM(lxm) }
+| ['-']?['0'-'9']+ as lxm
+| ['-']?"0x"['0'-'f']+ as lxm  { INT_LITERAL(lxm) }
 
 (* Mots-clefs et identificateurs *)
 
-| ['a'-'z''A'-'Z'] ['a'-'z''A'-'Z''0'-'9''_']* as lxm   
+| identifier as lxm   
   { match Hashtbl.find_opt keyword_table lxm with
     | Some kw -> kw
     | None -> IDENT(lxm) }
@@ -132,7 +131,7 @@ rule token = parse
 | [' ' '\t']           { token lexbuf }
 
 (* commentaires *)
-
+| "//"                 { comment_line lexbuf }
 | "/*"                 { comment lexbuf }
 
 (* fin de fichier *)
@@ -147,3 +146,7 @@ and comment = parse
 | "*/"     { token lexbuf }
 | ['\n' ] | ['\r''\n' ]   { (Lexing.new_line lexbuf) ; (comment lexbuf) }
 | _        { comment lexbuf }
+
+and comment_line = parse
+| ['\n' ] | ['\r''\n' ]   { (Lexing.new_line lexbuf) ; (token lexbuf) }
+| _                       { comment_line lexbuf }

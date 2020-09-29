@@ -1,0 +1,6 @@
+EXTERNAL r
+
+  print_string : OPERATION((),STRING) &
+  read : STRING --> STRING
+
+END

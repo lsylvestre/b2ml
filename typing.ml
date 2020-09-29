@@ -1,8 +1,15 @@
+(*****************************************)
+(** B2ML, un traducteur de B vers OCaml **)
+(** ----------------------------------- **)
+(** septembre 2020                      **)
+(** loic.sylvestre@etu.upmc.fr          **)
+(*****************************************)
+
+(* typage de B0 *)
 
 module Typing = struct
 
   type contexte = (Ast.ident_ren * Types.t) list
-
 
   let printEnvTy envTy = 
     List.iter
@@ -18,45 +25,43 @@ module Typing = struct
       Err.error_exit loc @@
       Printf.sprintf "Unbound value %s." @@
       Ast.string_of_ident_ren xr
-    | Some Types.(Alpha {contents=(Instanciated ty)}) -> ty
+    | Some Types.(T_alpha {contents=(Instanciated ty)}) -> ty
     | Some ty -> ty
 
   let typConstant k = 
     let open Ast in match k with
-    | Int _ -> Types.Int
-    | Bool _ -> Types.Bool
-    | String _ -> Types.String
+    | C_int _ -> Types.T_int
+    | C_bool _ -> Types.T_bool
+    | C_string _ -> Types.T_string
 
   let add_field ~loc ty x =
     let open Ast in
     match ty with
-      Types.Alpha v -> 
+      Types.T_alpha v -> 
       let v' = Types.fresh_variable () in
-      v := Types.(Instanciated (Struct(ref {fields=[x,Alpha v'];row=true})))
-    | Types.Struct ({contents={fields;row}} as r) -> 
+      v := Types.(Instanciated (T_struct(ref {fields=[x,T_alpha v'];row=true})))
+    | Types.T_struct ({contents={fields;row}} as r) -> 
       (match List.assoc_opt x fields with
        | Some _ -> ()
        | None ->
          r := let v = Types.fresh_variable () in
-           {fields=[x,Alpha v];row=true})
+           {fields=[x,T_alpha v];row=true})
     | _ -> Types.(unification_failure ~loc ty
-                    (Struct (ref {fields=[];row=true})))
+                    (T_struct (ref {fields=[];row=true})))
 
   let rec typTerm (envTy : contexte) (a:Ast.term) : Types.t = 
     let open Ast in
     let {desc;loc} = a in
     match desc with
-    | Const{k} -> typConstant k
-    | MLIdent _ -> assert false
-    (* MLIdent est privé, utiliser pendant la traduction *) 
-    | Ident{xr} -> typeVar envTy xr loc
-    | B_array{arr} -> 
+    | A_const{k} -> typConstant k
+    | A_ident{xr} -> typeVar envTy xr loc
+    | A_array{arr} -> 
       (match arr with 
        | B_array_init(idxs,a) ->
          let tya = typTerm envTy a in
-         Types.(Pow{ty=Tuple{tys=[(match idxs with 
+         Types.(T_pow{ty=T_tuple{tys=[(match idxs with 
              | idx::idxs -> List.fold_left (fun acc _ -> 
-                 Tuple{tys=[acc;Int]}) Int idxs
+                 T_tuple{tys=[acc;T_int]}) T_int idxs
              | _ -> assert false);
             tya]}}) (* pas complet *)
 
@@ -65,60 +70,66 @@ module Typing = struct
           | [] -> assert false (* cf grammaire *)
           | (idxs,a)::maplets ->
             let tya = typTerm envTy a in
-            let ty = Types.Tuple{tys=[(match idxs with 
+            let ty = Types.T_tuple{tys=[(match idxs with 
                 | [] -> assert false
                 | idx::idxs -> 
                   let ty0 = typTerm envTy idx in
-                  Types.unify ~loc Int ty0;
+                  Types.unify ~loc T_int ty0;
                   List.fold_left 
                     (fun acc idx -> 
-                       Types.unify ~loc Int (typTerm envTy idx);
-                       Types.Tuple{tys=[acc;typTerm envTy idx]}) ty0 idxs);tya]}
+                       Types.unify ~loc T_int (typTerm envTy idx);
+                       Types.T_tuple{tys=[acc;typTerm envTy idx]}) ty0 idxs);tya]}
             in
             List.iter (fun (idx,a) -> 
                 let tya = typTerm envTy a in
-                Types.unify ~loc ty (Types.Tuple{tys=[(match idxs with 
+                Types.unify ~loc ty (Types.T_tuple{tys=[(match idxs with 
                     | [] -> assert false
                     | idx::idxs -> 
                       let ty0 = typTerm envTy idx in
-                      Types.unify ~loc Int ty0;
+                      Types.unify ~loc T_int ty0;
                       List.fold_left 
                         (fun acc idx -> 
-                           Types.unify ~loc Int (typTerm envTy idx);
-                           Types.Tuple{tys=[acc;typTerm envTy idx]}) ty0 idxs);tya]})
+                           Types.unify ~loc T_int (typTerm envTy idx);
+                           Types.T_tuple{tys=[acc;typTerm envTy idx]}) ty0 idxs);tya]})
               )maplets;
-            Types.Pow{ty}))
+            Types.T_pow{ty}))
 
 
-    | Array_access{xr;idxs} -> 
-      (match typeVar envTy xr loc with
-       | Types.Pow{ty=Types.Tuple{tys=[tyidxs;ty0]}} -> 
+    | A_app (* A_array_access *) {xr={y;ty};idxs} -> 
+      let ty' = typeVar envTy y loc in
+       Types.unify ~loc ty ty';
+      (match ty' with
+        | Types.T_arrow{tyArgs;ty} -> 
+         Types.unify ~loc (Types.T_tuple{tys=tyArgs})
+                 (Types.T_tuple{tys=(List.map (typTerm envTy) idxs)});
+         ty
+       | Types.T_pow{ty=Types.T_tuple{tys=[tyidxs;ty0]}} -> 
          Types.unify ~loc tyidxs (match idxs with 
              | [] -> assert false
              | idx::idxs -> 
                (List.fold_left
                   (fun acc idx ->
-                     Types.Tuple{tys=[acc;(typTerm envTy idx)]})
+                     Types.T_tuple{tys=[acc;(typTerm envTy idx)]})
                   (typTerm envTy idx) idxs));
          ty0
-       | ty -> let a = Types.(Alpha (fresh_variable ())) in
-         let b = Types.(Alpha (fresh_variable ())) in
-         let ty' = Types.Pow{ty=Types.Tuple{tys=[a;b]}} in
+       | ty -> let a = Types.(T_alpha (fresh_variable ())) in
+         let b = Types.(T_alpha (fresh_variable ())) in
+         let ty' = Types.T_pow{ty=Types.T_tuple{tys=[a;b]}} in
          Types.unification_failure ~loc ty ty')
-    | Record_access{a;x} -> 
+    | A_record_access{a;x} -> 
       let ty = typTerm envTy a in 
       add_field ~loc ty x; 
       (match Types.shorten ty with
-       | Types.Struct {contents={fields}} -> 
+       | Types.T_struct {contents={fields}} -> 
          (match List.assoc_opt x fields with 
           | None -> Types.(unification_failure ~loc ty
-                             (let v = Types.(Alpha (fresh_variable ())) in 
-                              Struct (ref {fields=[x,v];row=true})))
+                             (let v = Types.(T_alpha (fresh_variable ())) in 
+                              T_struct (ref {fields=[x,v];row=true})))
           | Some ty -> ty)
        | _ -> Types.(unification_failure ~loc ty
-                       (let v = Types.(Alpha (fresh_variable ())) in 
-                        Struct (ref {fields=[x,v];row=true}))))
-    | Record_create{assocs} -> 
+                       (let v = Types.(T_alpha (fresh_variable ())) in 
+                        T_struct (ref {fields=[x,v];row=true}))))
+    | A_record_create{assocs} -> 
       let assocs = List.mapi (fun i (xopt,a) ->
           match xopt with 
           | None -> ("__fake__"^string_of_int i,a) 
@@ -126,24 +137,26 @@ module Typing = struct
       in
       let assocs = List.sort (fun (x,a) (x',a') -> compare a a') assocs in
       let fields = List.map (fun (x,a) -> (x,typTerm envTy a)) assocs in
-      Types.(Struct(ref {fields;row=false}))
-    | AppUnOp{op=Uminus;a}
-    | AppUnOp{op=Succ;a}
-    | AppUnOp{op=Pred;a} -> 
-      Types.unify ~loc Types.Int (typTerm envTy a);
-      Types.Int
-    | AppBinOp{op=Add;a1;a2} 
-    | AppBinOp{op=Sub;a1;a2} 
-    | AppBinOp{op=Mul;a1;a2}
-    | AppBinOp{op=Div;a1;a2} 
-    | AppBinOp{op=Pow;a1;a2}
-    | AppBinOp{op=Mod;a1;a2} -> 
-      Types.unify ~loc Types.Int (typTerm envTy a1);
-      Types.unify ~loc Types.Int (typTerm envTy a2);
-      Types.Int
-    | TermOfCondition{c} -> 
-      Types.unify ~loc Types.Bool (typCondition envTy c);
-      Types.Bool
+      Types.(T_struct(ref {fields;row=false}))
+    | A_app_unop{op=Uminus;a}
+    | A_app_unop{op=Succ;a}
+    | A_app_unop{op=Pred;a} -> 
+      Types.unify ~loc Types.T_int (typTerm envTy a);
+      Types.T_int
+    | A_app_binop{op=Add;a1;a2} 
+    | A_app_binop{op=Sub;a1;a2} 
+    | A_app_binop{op=Mul;a1;a2}
+    | A_app_binop{op=Div;a1;a2} 
+    | A_app_binop{op=Pow;a1;a2}
+    | A_app_binop{op=Mod;a1;a2} -> 
+      Types.unify ~loc Types.T_int (typTerm envTy a1);
+      Types.unify ~loc Types.T_int (typTerm envTy a2);
+      Types.T_int
+    | A_Range{a1;a2} -> 
+      Types.T_range
+    | A_of_condition{c} -> 
+      Types.unify ~loc Types.T_bool (typCondition envTy c);
+      Types.T_bool
 
   and typCondition (envTy : contexte) (c : Ast.condition) : Types.t = 
     let open Ast in
@@ -154,49 +167,49 @@ module Typing = struct
       let ty1 = typTerm envTy a1 in
       let ty2 = typTerm envTy a2 in
       Types.unify ~loc ty1 ty2;
-      Types.Bool
+      Types.T_bool
 
     | Compare{op=Lt;a1;a2}
     | Compare{op=Gt;a1;a2}
     | Compare{op=Le;a1;a2}
     | Compare{op=Ge;a1;a2} -> 
-      Types.unify ~loc Types.Int (typTerm envTy a1);
-      Types.unify ~loc Types.Int (typTerm envTy a2);
-      Types.Bool
+      Types.unify ~loc Types.T_int (typTerm envTy a1);
+      Types.unify ~loc Types.T_int (typTerm envTy a2);
+      Types.T_bool
 
     | And{c1;c2}
     | Or{c1;c2} -> 
       let ty1 = typCondition envTy c1 in
       let ty2 = typCondition envTy c2 in
       Types.unify ~loc ty1 ty2;
-      Types.Bool
+      Types.T_bool
     | Not{c} -> 
-      Types.unify ~loc Types.Int (typCondition envTy c);
-      Types.Bool
+      Types.unify ~loc Types.T_int (typCondition envTy c);
+      Types.T_bool
 
   let rec typInst (envTy : contexte) (i : Ast.instruction) : Types.t = 
     let open Ast in
     let {desc;loc} = i in
     match desc with
-    | Skip -> Types.Unit
+    | I_skip -> Types.T_unit
 
-    | Assign{xr;a} -> 
+    | I_assign{xr;a} -> 
       let ty1 = typeVar envTy xr loc in
       let ty2 = typTerm envTy a in
       Types.unify ~loc ty1 ty2;
-      Types.Unit
+      Types.T_unit
 
-    | Record_assign{xr;xs;a} -> 
+    | I_record_assign{xr;xs;a} -> 
       let ty_record = typeVar envTy xr loc in
       let ty_value = typTerm envTy a in
       let tyCase = List.fold_left 
           (fun ty x ->
              add_field ~loc ty x;
              let ty = match ty with
-               | Types.(Alpha{contents=Instanciated ty}) -> ty
+               | Types.(T_alpha{contents=Instanciated ty}) -> ty
                | ty -> ty in
              match ty with 
-             | Types.Struct{contents={fields}} -> 
+             | Types.T_struct{contents={fields}} -> 
                (match List.assoc_opt x fields with 
                 | None -> assert false
                 | Some ty' -> ty')
@@ -204,25 +217,24 @@ module Typing = struct
           ty_record xs
       in
       Types.unify ~loc ty_value tyCase;
-      Types.Unit
+      Types.T_unit
 
-    | Array_assign{xr;idxs;a} -> 
+    | I_array_assign{xr;idxs;a} -> 
 
-      (match typeVar envTy xr loc with
-       | Types.Pow{ty=Types.Tuple{tys=[tyidxs;ty0]}} -> 
+      let ty = typeVar envTy xr loc in
+      (match ty with
+       | Types.T_pow{ty=Types.T_tuple{tys=[tyidxs;ty0]}} -> 
          Types.unify ~loc ty0 (typTerm envTy a)
        | _ -> ());
+      let _ = typTerm envTy ({loc;desc=A_app(* A_array_access*) {xr={y=xr;ty};idxs}}) in
+      Types.T_unit
 
-      let _ = typTerm envTy ({loc;desc=Array_access{xr;idxs}}) in
-      Types.Unit
-
-    | Block{i} -> typInst envTy i
-    | Var{xs;i} -> 
+    | I_var{xs;i} -> 
       let ext = List.map (fun Ast.{y;ty} -> (Ast.x2xr y,ty)) xs in
       let _ = typInst (ext @ envTy) i in
-      Types.Unit
+      Types.T_unit
 
-    | Call {outs;op;args} -> 
+    | I_call {outs;op;args} -> 
       let opTy = typeVar envTy op loc in
       let tyArgs = List.map (typTerm envTy) args in
       let tyOut =
@@ -230,61 +242,61 @@ module Typing = struct
           (fun {y;ty} ->
             Types.unify ~loc ty (typeVar envTy y loc); ty) outs
       in
-      Types.unify ~loc opTy (Operation{tyOut;tyArgs}); 
-      Types.Unit
+      Types.unify ~loc opTy (T_operation{tyOut;tyArgs}); 
+      Types.T_unit
 
-    | Seq{i1;i2} -> 
-      Types.unify ~loc Types.Unit (typInst envTy i1);
-      Types.unify ~loc Types.Unit (typInst envTy i2);
-      Types.Unit
+    | I_seq{i1;i2} -> 
+      Types.unify ~loc Types.T_unit (typInst envTy i1);
+      Types.unify ~loc Types.T_unit (typInst envTy i2);
+      Types.T_unit
 
-    | If{c0;i0;cases;others} -> 
+    | I_if{c0;i0;cases;others} -> 
 
       List.iter
         (fun (c,i) -> 
-           Types.unify ~loc Types.Bool (typCondition envTy c);
-           Types.unify ~loc Types.Unit (typInst envTy i)
+           Types.unify ~loc Types.T_bool (typCondition envTy c);
+           Types.unify ~loc Types.T_unit (typInst envTy i)
         ) 
         ((c0,i0) :: cases);
       (match others with
        | None -> ();
-       | Some i -> Types.unify ~loc Types.Unit (typInst envTy i));
-      Types.Unit
+       | Some i -> Types.unify ~loc Types.T_unit (typInst envTy i));
+      Types.T_unit
 
-    | Case {a;cases;others} -> 
+    | I_case {a;cases;others} -> 
       let ty = typTerm envTy a in
       List.iter
         (fun (ks,i) -> 
            List.iter (fun k -> Types.unify ~loc ty (typConstant k)) ks;
-           Types.unify ~loc Types.Unit (typInst envTy i)
+           Types.unify ~loc Types.T_unit (typInst envTy i)
         ) cases;
       (match others with
        | None -> ();
-       | Some i -> Types.unify ~loc Types.Unit (typInst envTy i));
-      Types.Unit
+       | Some i -> Types.unify ~loc Types.T_unit (typInst envTy i));
+      Types.T_unit
 
-    | While{c;i} ->
-      Types.unify ~loc Types.Bool (typCondition envTy c);
-      Types.unify ~loc Types.Unit (typInst envTy i);
-      Types.Unit
-    | Assert{c;i} ->
-      Types.unify ~loc Types.Bool (typCondition envTy c);
-      Types.unify ~loc Types.Unit (typInst envTy i);
-      Types.Unit
+    | I_while{c;i} ->
+      Types.unify ~loc Types.T_bool (typCondition envTy c);
+      Types.unify ~loc Types.T_unit (typInst envTy i);
+      Types.T_unit
+    | I_assert{c;i} ->
+      Types.unify ~loc Types.T_bool (typCondition envTy c);
+      Types.unify ~loc Types.T_unit (typInst envTy i);
+      Types.T_unit
 
-    | Print_int {a} ->
-      Types.unify ~loc Types.Int (typTerm envTy a);
-      Types.Unit
-    | Print_type{a} -> 
+    | Debug_print_int {a} ->
+      Types.unify ~loc Types.T_int (typTerm envTy a);
+      Types.T_unit
+    | Debug_print_type{a} -> 
       let ty = typTerm envTy a in
       let () =
         Printf.printf "[informative] %s\n\
                       \ This expression has type %s\n"
           (Err.string_of_position loc) (Types.printTy ty)
       in
-      Types.Unit
+      Types.T_unit
 
-    | Ill_typed{a} ->
+    | Debug_ill_typed{a} ->
       (try ignore (typTerm envTy a); 
          Printf.printf "----------------------%s\n\
                        \ This expression should be ill-typed !\n\
@@ -298,7 +310,7 @@ module Typing = struct
            (Err.string_of_position loc)
            (Types.printTy ty1)
            (Types.printTy ty2)); 
-      Types.Unit
+      Types.T_unit
 
 
   let typOperation ~loc envTy Ast.{h={return=outs;name;args};i} =
@@ -313,8 +325,8 @@ module Typing = struct
                     (fun Ast.{y;ty} v -> (Ast.x2xr y,ty))
                     (args @ outs)
                     (tyArgs @ tyOut) ) @ envTy in
-    Types.unify ~loc Types.Unit (typInst envTy i);
-    let tyop = Types.Operation{tyArgs;tyOut} in
+    Types.unify ~loc Types.T_unit (typInst envTy i);
+    let tyop = Types.T_operation{tyArgs;tyOut} in
     (name,tyop)::envTy
 
   let typClauseOperations ~loc envTy ops = 
@@ -351,7 +363,7 @@ module Typing = struct
               in
 
               Types.unify ~loc ty
-                (Types.Machine{parameters=
+                (Types.T_machine{parameters=
                                  List.map
                                    (typTerm envTy)
                                    parameters});
@@ -377,7 +389,7 @@ module Typing = struct
                 let ext =
                   List.map
                     (fun cstr ->
-                       ( Ast.Id_ren{x=cstr;r=[]},Types.Ident{name=x}))
+                       (Ast.Id_ren{x=cstr;r=[]},Types.T_ident{name=x}))
                     enum
                 in
                 ext @ envTy)
@@ -388,20 +400,14 @@ module Typing = struct
           typClauseOperations ~loc envTy ops (* local *) 
 
         | Ast.InitialisationB0 {i} ->
-          Types.unify ~loc Types.Unit (typInst envTy i);
+          Types.unify ~loc Types.T_unit (typInst envTy i);
           envTy
+        (*| Ast.Concrete_constants {cs} -> 
+           List.map (fun c -> (Ast.x2xr c,Types.T_alpha (Types.fresh_variable()))) cs @ envTy *)
         | Ast.Values {bindings} -> 
-          List.fold_left (fun envTy (x,v) ->
-              match v with 
-              | Ast.TermValue a -> 
+          List.fold_left (fun envTy (x,a) ->   
                 let ty = typTerm envTy a in
-                (Ast.Id_ren{x;r=[]},ty)::envTy
-              | Ast.IntervalValue(Interval(a1,a2)) -> 
-                let ty1 = typTerm envTy a1 in
-                let ty2 = typTerm envTy a2 in
-                (Ast.Id_ren{x;r=[]},Types.Tuple{tys=[ty1;ty2]})::envTy
-              | Ast.IntervalValue (AliasInterval _) ->
-                (Printf.printf "todo";assert false))
+                (Ast.Id_ren{x;r=[]},ty)::envTy)
             envTy bindings
         | Ast.Concrete_variables {xs} ->
           let ext = List.map (fun {y=xr;ty} -> xr,ty) xs in
@@ -409,21 +415,22 @@ module Typing = struct
         | _ -> envTy) envTy cs ;;
 
 
-  let rec typComponent envTy Ast.{loc;desc} = 
+  let rec typComponent envTy Ast.{loc;desc} =
     match desc with
     | Ast.Component {name;parameters;clauses=cs} ->
+      Err.current_file_name := name;
       let vars = List.map (fun Ast.{ty} -> ty) parameters in
       let ext = List.map2 (fun Ast.{y} v -> Ast.x2xr y,v) parameters vars in
       let envTy = ext @ envTy in
       let envTy = typClauses envTy cs in
       let envTy = List.map (function 
-          | (Ast.Id_ren{x;r=[]},Types.Machine _) as b -> b
+          | (Ast.Id_ren{x;r=[]},Types.T_machine _) as b -> b
           | (Ast.Id_ren{x;r=[]},ty) -> (Ast.Id_ren{x;r=[name]},ty)
           | b -> b) envTy in
-      (Ast.Id_ren{x=name;r=[]},Types.Machine{parameters=vars}) :: envTy
+      (Ast.Id_ren{x=name;r=[]},Types.T_machine{parameters=vars}) :: envTy
 
-  let typComponents cps =
-    List.fold_left typComponent [] cps
+  let typComponents ?(init_envTy=[]) cps =
+    List.fold_left typComponent init_envTy cps
 
 end
 
@@ -441,7 +448,7 @@ let handle_ty_error f =
     Err.error_exit loc msg'
 
 
-let typComponents cps = 
+let typComponents ?(init_envTy=[]) cps = 
   handle_ty_error @@
   (fun () ->
-     ignore (Typing.typComponents cps))
+     ignore (Typing.typComponents ~init_envTy cps))

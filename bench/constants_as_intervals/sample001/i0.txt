@@ -4,6 +4,6 @@ IMPLEMENTATION i0
 CONCRETE_CONSTANTS c1,c2
 
 VALUES c1 = 3 .. 17;
-       c2 = (c1) * {42}
+       c2 = c1 * (0 .. 2) * (0 .. (17+45)) * {42}
 
 END

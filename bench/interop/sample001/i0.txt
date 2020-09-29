@@ -1,0 +1,10 @@
+IMPLEMENTATION i0
+  REFINES m0
+
+  INITIALISATION 
+    VAR x IN
+      x := r.of_string("hello world");
+      r.print(x)
+    END
+END
+

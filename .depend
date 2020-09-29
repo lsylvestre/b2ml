@@ -4,57 +4,8 @@ ast.cmo : \
 ast.cmx : \
     types.cmx \
     err.cmx
-class_translate.cmo : \
-    types.cmo \
-    target.cmo \
-    runtime.cmo \
-    pprint.cmo \
-    names.cmi \
-    err.cmo \
-    ast.cmo \
-    class_translate.cmi
-class_translate.cmx : \
-    types.cmx \
-    target.cmx \
-    runtime.cmx \
-    pprint.cmx \
-    names.cmx \
-    err.cmx \
-    ast.cmx \
-    class_translate.cmi
-class_translate.cmi : \
-    types.cmo \
-    target.cmo \
-    err.cmo \
-    ast.cmo
 err.cmo :
 err.cmx :
-fun_ast.cmo : \
-    types.cmo
-fun_ast.cmx : \
-    types.cmx
-fun_pprint.cmo : \
-    types.cmo \
-    fun_ast.cmo
-fun_pprint.cmx : \
-    types.cmx \
-    fun_ast.cmx
-fun_translate.cmo : \
-    types.cmo \
-    runtime.cmo \
-    names.cmi \
-    fun_pprint.cmo \
-    fun_ast.cmo \
-    err.cmo \
-    ast.cmo
-fun_translate.cmx : \
-    types.cmx \
-    runtime.cmx \
-    names.cmx \
-    fun_pprint.cmx \
-    fun_ast.cmx \
-    err.cmx \
-    ast.cmx
 lexer.cmo : \
     parser.cmi \
     err.cmo
@@ -63,36 +14,37 @@ lexer.cmx : \
     err.cmx
 main.cmo : \
     typing.cmo \
-    translate.cmi \
-    runtime.cmo \
+    translate.cmo \
+    target.cmo \
     prelex.cmo \
     parser.cmi \
+    merge.cmo \
     lexer.cmo \
-    fun_translate.cmo \
     err.cmo \
-    class_translate.cmi \
     ast.cmo
 main.cmx : \
     typing.cmx \
     translate.cmx \
-    runtime.cmx \
+    target.cmx \
     prelex.cmx \
     parser.cmx \
+    merge.cmx \
     lexer.cmx \
-    fun_translate.cmx \
     err.cmx \
-    class_translate.cmx \
     ast.cmx
-names.cmo : \
-    names.cmi
-names.cmx : \
-    names.cmi
-names.cmi :
+merge.cmo : \
+    ast.cmo
+merge.cmx : \
+    ast.cmx
+names.cmo :
+names.cmx :
 parser.cmo : \
+    types.cmo \
     err.cmo \
     ast.cmo \
     parser.cmi
 parser.cmx : \
+    types.cmx \
     err.cmx \
     ast.cmx \
     parser.cmi
@@ -108,10 +60,6 @@ pprint.cmx : \
     ast.cmx
 prelex.cmo :
 prelex.cmx :
-runtime.cmo : \
-    ast.cmo
-runtime.cmx : \
-    ast.cmx
 target.cmo : \
     types.cmo \
     ast.cmo
@@ -121,26 +69,17 @@ target.cmx : \
 translate.cmo : \
     types.cmo \
     target.cmo \
-    runtime.cmo \
     pprint.cmo \
-    names.cmi \
+    names.cmo \
     err.cmo \
-    ast.cmo \
-    translate.cmi
+    ast.cmo
 translate.cmx : \
     types.cmx \
     target.cmx \
-    runtime.cmx \
     pprint.cmx \
     names.cmx \
     err.cmx \
-    ast.cmx \
-    translate.cmi
-translate.cmi : \
-    types.cmo \
-    target.cmo \
-    err.cmo \
-    ast.cmo
+    ast.cmx
 types.cmo : \
     err.cmo
 types.cmx : \

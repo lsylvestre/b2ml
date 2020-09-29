@@ -1,0 +1,61 @@
+EXTERNAL io_constants
+  IO_ON : INT &
+  IO_OFF : INT
+END
+
+EXTERNAL lchip_interface
+  print_global_inputs : OPERATION((),()) &
+  read_global_input : OPERATION((INT),(INT)) &
+  write_global_output : OPERATION((),(INT,INT)) &
+  get_ms_tick : OPERATION((INT),()) &
+  print_uint8 : OPERATION((),(INT,INT))
+END
+
+EXTERNAL g_operators
+    bitwise_sll_uint32 : INT*INT --> INT &
+    bitwise_srl_uint32 : INT*INT --> INT &
+    bitwise_not_uint32 : INT --> INT &
+    bitwise_and_uint32 : INT*INT --> INT &
+    bitwise_xor_uint32 : INT*INT --> INT &
+    bitwise_or_uint32 : INT*INT --> INT &
+    bitwise_sll_uint16 : INT*INT --> INT &
+    bitwise_srl_uint16 : INT*INT --> INT &
+    bitwise_not_uint16 : INT --> INT &
+    bitwise_and_uint16 : INT*INT --> INT &
+    bitwise_xor_uint16 : INT*INT --> INT &
+    bitwise_or_uint16 : INT*INT --> INT &
+    bitwise_sll_uint8 : INT*INT --> INT &
+    bitwise_srl_uint8 : INT*INT --> INT &
+    bitwise_not_uint8 : INT --> INT &
+    bitwise_and_uint8 : INT*INT --> INT &
+    bitwise_xor_uint8 : INT*INT --> INT &
+    bitwise_or_uint8 : INT*INT --> INT &
+
+    add_uint32 : INT*INT --> INT &
+    sub_uint32 : INT*INT --> INT &
+    mul_uint32 : INT*INT --> INT &
+    add_uint16 : INT*INT --> INT &
+    sub_uint16 : INT*INT --> INT &
+    mul_uint16 : INT*INT --> INT &
+    add_uint8 : INT*INT --> INT &
+    sub_uint8 : INT*INT --> INT &
+    mul_uint8 : INT*INT --> INT 
+END
+
+EXTERNAL safety_variables
+  /* mutable */ safety_variables_array : INT &
+  struct_safety_variables_size_minus_1 : INT 
+END
+
+EXTERNAL g_standard_types
+    uint32_t : RANGE & 
+    uint16_t : RANGE &
+    uint8_t : RANGE
+END
+
+EXTERNAL lchip_configuration
+
+    MAX_NB_MODULES : INT &
+    MAX_NB_INPUTS : INT &
+    MAX_NB_OUTPUTS : INT
+END

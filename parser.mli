@@ -3,58 +3,48 @@
 
 type token = 
   | WHILE
-  | WHERE
-  | WHEN
   | VARIANT
-  | VARIABLES
   | VAR
   | VALUES
   | USES
+  | T_STRING
+  | T_OPERATION
+  | T_BOOL
   | TRUE
   | THEN
   | Succ
   | Struct
   | Skip
   | STRING_LITERAL of (string)
-  | STRING
   | STAR_STAR
   | STAR
   | SLASH_EQ
-  | SLASH_COL
   | SLASH
   | SETS
   | SEMICOL
-  | SELECT
   | SEES
   | Rec
   | RPAREN
   | REFINES
   | REFINEMENT
   | RCURLY
-  | RBRACKET
   | QUOTE
   | Pred
-  | PROPERTIES
   | PROMOTES
   | PRINT_TYPE
   | PRINT_INT
-  | POW1
   | POW
   | PLUS
-  | PIPE_PIPE
   | PIPE_MINUS_GT
-  | PIPE
   | Or
   | OR
   | OPERATIONS
   | OF
   | Not
-  | NUM of (string)
-  | NATURAL1
-  | NATURAL
   | NAT1
   | NAT
   | Mod
+  | MINUS_MINUS_GT
   | MINUS
   | MININT
   | MAXINT
@@ -64,12 +54,8 @@ type token =
   | LT
   | LPAREN
   | LOCAL_OPERATIONS
-  | LCURLY_RCURLY
   | LCURLY
-  | LBRACKET_RBREACK
-  | LBRACKET
-  | INVARIANT
-  | INTEGER
+  | INT_LITERAL of (string)
   | INT
   | INITIALISATION
   | INCLUDES
@@ -82,6 +68,7 @@ type token =
   | GT_EQ
   | GT
   | FALSE
+  | EXTERNAL
   | EXTENDS
   | EQ
   | EOF
@@ -100,7 +87,6 @@ type token =
   | COL
   | CASE
   | Bool
-  | BOOL
   | BEGIN
   | ASSERT
   | AMPERSAND
@@ -111,4 +97,4 @@ exception Error
 
 (* The monolithic API. *)
 
-val component_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.component)
+val component_eof: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Ast.component option)

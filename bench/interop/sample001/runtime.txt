@@ -1,0 +1,7 @@
+EXTERNAL r
+
+  default : t &
+  of_string : STRING --> t &
+  print : OPERATION((),t)
+
+END

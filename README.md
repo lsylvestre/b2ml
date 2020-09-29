@@ -1,9 +1,9 @@
 # B2ML
-====
 
-Traducteur **B0** vers **OCaml**.
 
-#### Installation 
+Traducteur **B** vers **OCaml**.
+
+### Installation 
 
 avec *opam* 
 ```
@@ -12,21 +12,21 @@ $ opam install menhir
 $ make
 ```
 
-~> produit l'exécutable `./b2ml`.
+ ~> produit l'exécutable `./b2ml`.
 
-#### Utilisation 
+### Utilisation 
 
-`./b2ml` traduit les sources B passés en argument :
+`./b2ml` traduit les sources **B** passés en arguments :
 ```
   ./b2ml <filenames>
 ```
 Par défaut, le programme engendré se situe dans le fichier `generated_files/b_translation.ml`
 
-- Options *-dst* et *-o*
+- Options `-dst` et `-o`
 
 La commande `./b2ml -dst=generated_files -o="traduction" <filenames>` engendre le programme OCaml **generated_files/traduction.ml** .
 
-- Option -I
+- Option `-I`
 
 `./b2ml -I=dir f1 f2 f3` est une abréviation pour `./b2ml dir/f1 dir/f2 dir/f3`
 
@@ -38,13 +38,57 @@ l'ordre des raffinements et implémentations n'importe pas.
 
 `make translate I=dir M="m0 m1 m2"` est une abréviation pour `./b2ml dir/m0/* dir/m1/* dir/m2/*`
 
-- options *-obj* et *-fun*
+- options `-externals` 
+ 
+  `./b2ml -externals=init.ml f1 f2 f3` traduit ajoute le contenu du fichier `init.ml` dans le source engendré par traduction de `f1`, `f2` et `f3`.
 
-Par défaut, le code généré utilise le système de module d'OCaml pour représenter les modules B.
+### Intéropérabilité avec **OCaml**
 
-L'option *-obj* (experimentale !!) réalise une traduction des modules B vers des classes et des objets OCaml.
+Les *machines de bases* sont des machines **B** qui n'ont pas d'implémentation en **B**. Les fichiers d'implémentation **OCaml** peuvent être donnés à `b2ml` via l'option `-externals`. Cependant, le traducteur doit également connaitre les types des valeurs et opérations déclarées définies dans ces fichiers **OCaml**. Ces informations, contenues dans le corps des machines de bases, sont difficile à extraire. On déclarera donc une machine de base avec une syntaxe alternative. Par exemple une machine `string_lib` :
 
-L'option *-fun* (experimentale !!) réalise une traduction d'un sous-ensemble de B vers un programme OCaml purement fonctionnel. Le renommage et les machines paramétrés ne sont pas supportés.
+```
+EXTERNALS string_lib
+  max_size : INT &
+  concat : STRING * STRING -> STRING &
+  print : OPERATION((),STRING)
+END
+```
+
+- grammaire des expressions de types
+
+```
+<ty> ::=  
+ | (<ty>) 
+ | INT | BOOL | STRING                ; types primitifs
+ | <ident>                            ; type abstrait
+ | <ty> * <ty> * ... * <ty>           ; n-uplet
+ | POW (<ty> * ... * <ty>)            ; type tableau
+ | Struct (<ident> : <ty>, ...)       ; type enregistrement
+ | OPERATION                          ; type opération
+       ((out1,out2,...,outn),             ; paramètres de sortie
+        (arg1,arg2,...,argn))             ; paramètres d'entrée
+ | <ty> * <ty> * ... * <ty> --> <ty>  ; type primitive
+```
+
+- Regle d'anticollision des identificateurs
+
+  En B, *"un identificateur est une séquence de lettres, de chiffres ou du caractère souligné "_". 
+         Le premier caractère doit être une lettre. Les lettres minuscules et majuscules sont distinguées."*
+
+Par convention, on choisit trois règles de traduction des identificateurs **B** vers **OCaml** :
+  - la traduction d'un identificateur `xx` vers un identificateur de variable ou de type **OCaml** est `_xx`
+  - la traduction d'un identificateur `xx` vers un identificateur de module **OCaml** est `M_xx`
+  - la traduction d'un identificateur `xx` vers un identificateur de constructeur **OCaml** est `C_xx`
+
+Ces règles doivent être prisent en compte lorsque l'on souhaite implanter en **OCaml** une machine de base **B**.
+Par exemple :
+```
+module M_string_lib = struct
+  let _max_size = Sys.max_string_length
+  let _concat = (@)
+  let _print = print_string
+end
+```
 
 ### Tests
 
@@ -61,7 +105,7 @@ Le dossier **bench** contient des jeux de tests.
 Le script `./test.sh` vérifie le comportement de `b2ml` sur ces jeux de tests (via la commande `make expect`).
 
 
-#### Exemple
+### Exemple
 
 Soient les 3 modules **B** suivants (cf. *bench/partage/sample001*):
 ```

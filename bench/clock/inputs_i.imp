@@ -1,0 +1,48 @@
+/* WARNING : LCHIP system source file, do not edit */
+
+IMPLEMENTATION
+    inputs_i
+REFINES
+    inputs
+SEES
+    g_types,
+    io_constants,
+    user_configuration,
+    lchip_interface
+
+    // pragma SAFETY_VARS
+CONCRETE_VARIABLES
+    I1,
+    I2,
+    I3
+INVARIANT
+    I1 : uint8_t &
+    I2 : uint8_t &
+    I3 : uint8_t
+INITIALISATION
+    I1 := IO_OFF;
+    I2 := IO_OFF;
+    I3 := IO_OFF
+OPERATIONS
+    read_inputs =
+    BEGIN
+        I1 <-- read_global_input(0);
+        I2 <-- read_global_input(1);
+        I3 <-- read_global_input(2)
+    END;
+
+    po <-- get_I1 =
+    BEGIN
+        po := I1
+    END;
+
+    po <-- get_I2 =
+    BEGIN
+        po := I2
+    END;
+
+    po <-- get_I3 =
+    BEGIN
+        po := I3
+    END
+END

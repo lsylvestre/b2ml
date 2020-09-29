@@ -1,3 +1,13 @@
+(*****************************************)
+(** B2ML, un traducteur de B vers OCaml **)
+(** ----------------------------------- **)
+(** septembre 2020                      **)
+(** loic.sylvestre@etu.upmc.fr          **)
+(*****************************************)
+
+(* gestion des erreurs de traduction *)
+
+
 open Printf
 open Lexing
 

@@ -1,10 +1,13 @@
-#############################################################################
-### B2ML, août 2020                                                        ##
-#############################################################################
+#*****************************************#
+#** B2ML, un traducteur de B vers OCaml **#
+#** ----------------------------------- **#
+#** septembre 2020                      **#
+#** loic.sylvestre@etu.upmc.fr          **#
+#*****************************************#
 
 CAMLC=ocamlc
 CAMLLEX=ocamllex
-MENHIR=menhir --explain  # --interpret
+MENHIR=menhir
 CAMLDEP=ocamldep
 
 B2ML=b2ml
@@ -16,13 +19,11 @@ DST=generated_files
 TMP=tmp
 
 OBJS=err.cmo types.cmo ast.cmo \
-	prelex.cmo parser.cmo lexer.cmo \
-	typing.cmo names.cmo \
-	runtime.cmo\
-	fun_ast.cmo fun_pprint.cmo fun_translate.cmo \
-	target.cmo pprint.cmo translate.cmo \
-	class_translate.cmo \
-	main.cmo
+	prelex.cmo parser.cmo lexer.cmo typing.cmo \
+	target.cmo \
+	pprint.cmo\
+	names.cmo translate.cmo \
+	merge.cmo main.cmo
 
 SRC-OBJS=$(foreach f,$(OBJS),$(SRC-DIR)$f)
 
@@ -48,6 +49,7 @@ clean:	clean_dst
 	rm -f parser.conflicts
 	rm -f $(B2ML)
 	rm -f *~ *.cm[oix]
+	rm -rf tmp
 
 $(DST):
 	mkdir $(DST)
@@ -98,8 +100,25 @@ expect_traduction_error:
 test:	translate compile run
 	echo
 
-test-op:
-	./b2ml test/test-op/m0.txt test/test-op/op.txt
+CLOCK=bench/clock
+clock:
+	./b2ml \
+	 -externals=$(CLOCK)/externals.ml\
+	 $(CLOCK)/externals.txt\
+	 $(CLOCK)/g_types.mch\
+	 $(CLOCK)/user_configuration.mch\
+	 $(CLOCK)/lchip_configuration.mch\
+	 $(CLOCK)/user_ctx.mch\
+	 $(CLOCK)/inputs.mch\
+	 $(CLOCK)/logic.mch\
+	 $(CLOCK)/outputs.mch\
+	 $(CLOCK)/user_component.mch\
+	 $(CLOCK)/g_types_i.imp $(CLOCK)/user_component_i.imp\
+	 $(CLOCK)/inputs_i.imp $(CLOCK)/user_configuration_i.imp\
+	 $(CLOCK)/logic_i.imp $(CLOCK)/user_ctx_i.imp\
+	 $(CLOCK)/outputs_i.imp
 
-test-mch-params:
-	./b2ml test/test-mch-params/ma.txt test/test-mch-params/mb.txt test/test-mch-params/imp.txt
+interop:
+	./b2ml -I=bench/interop/sample000 runtime.txt -externals=runtime.ml i0.txt m0.txt
+interop2:
+	./b2ml -I=bench/interop/sample001 runtime.txt -externals=runtime.ml i0.txt m0.txt
