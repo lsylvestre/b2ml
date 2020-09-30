@@ -97,7 +97,8 @@ type decl =
                      fields:ty_record_field list}
   | Let of {p:patern;e:exp}
   | VoidExp of {e:exp}
-  | LetFun of {x:name;args:patern list;e:exp}
+  | LetFun of letfun
+  | LetFunRec of letfun list
   | ModuleDecl of {module_name:name;structure: structure}
   | ModuleAliasDecl of {alias:name;module_name:name}
   | FunctorDecl of {functor_name:name;parameters:(name * signature) list;structure:structure}
@@ -110,7 +111,7 @@ and patern = PLiteral of const | PVar of name | PNuplet of patern list
 
 and signature = (name * Types.t) list
 and structure = module_component list
-and letfun = {x:name;args:name list;e:exp}
+and letfun = {x:name;args:patern list;e:exp}
 
 and ty_record_field = RecordField of {x:name;ty:Types.t;mutability:bool}
 

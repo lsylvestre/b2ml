@@ -327,9 +327,16 @@ module Typing = struct
                     (tyArgs @ tyOut) ) @ envTy in
     Types.unify ~loc Types.T_unit (typInst envTy i);
     let tyop = Types.T_operation{tyArgs;tyOut} in
-    (name,tyop)::envTy
+    let tyop' = typeVar envTy name loc in  
+    Types.unify ~loc tyop tyop';
+    envTy
 
   let typClauseOperations ~loc envTy ops = 
+    (* les opérations sont mutuellement récursives *)
+    let envTy = List.map (fun (Ast.{desc={h={return=outs;name;args}}})->
+                      (name,Types.(T_operation{tyArgs=List.map (fun _ ->  T_alpha(fresh_variable ())) args;
+                                               tyOut=List.map (fun _ -> T_alpha(fresh_variable ())) outs}))) ops 
+                @ envTy in
     List.fold_left (fun envTy Ast.{desc;loc} -> 
         typOperation ~loc envTy desc) envTy ops
 

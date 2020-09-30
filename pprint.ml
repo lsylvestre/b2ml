@@ -222,7 +222,14 @@ let rec print_decl ?(lvl=0) d =
   | Let{p;e} -> sptf "let %s = %s" (print_patern p) (print_exp e)
   | VoidExp{e} -> sptf "let () = %s" (print_exp e)
   | LetFun{x;args;e} -> sptf "let %s %s = %s" x (mapcat " " print_patern args) (print_exp e)
- 
+  | LetFunRec funs -> 
+    sptf "let rec " ^ 
+    (mapcat "\nand " (fun Target.{x;args;e} -> 
+                             sptf "%s %s = %s" 
+                                 x 
+                                 (mapcat " " print_patern args) 
+                                 (print_exp e))) 
+              funs
   | TyRecordDecl {bound_variables;name;fields} -> 
     (match fields with 
      | [] -> "()" 

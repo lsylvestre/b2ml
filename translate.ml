@@ -689,12 +689,14 @@ let rw_concrete_constants ~(env : env) ~(cs : Ast.ident list) =
 
 let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
     ~(local:bool) =
+  (* les opérations sont mutuellement récursives *)
   let env = 
     let idents=List.map (function Ast.{desc={h={name}}} -> name) ops in
     env_extends ~env ~vartype:Target.Cst ~idents 
   in
   let rec aux acc env = function
-    | [] -> (List.rev acc,env) 
+    | [] -> let res = [Target.LetFunRec (List.rev acc)] in
+            (res,env)
     | Ast.{desc={h={return=outs;name;args};i}}::xs -> 
 
       (* ajout des arguments de l'opération à l'environnement *)
@@ -718,7 +720,7 @@ let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
       let outs = List.map (fun Ast.{y} -> Target.PVar (normalize_ident y)) outs in
       let args=outs@ args in
       let args = match args with [] -> [Target.(PLiteral ML_C_unit)] | _ -> args in
-      aux (Target.LetFun{x;args;e}::acc) env xs
+      aux (Target.{x;args;e}::acc) env xs
   in
   let res,env = aux [] env ops in
   let res = Target.D_comment{s="operations"} :: res in
@@ -756,7 +758,7 @@ let rw_clause ~(env : env) ~(component_name:Ast.ident) ~(clause:Ast.clause)
   | Ast.InitialisationB0 {i} -> rw_initialisationB0 ~env ~inst:i
   | Ast.Concrete_constants {cs} -> rw_concrete_constants ~env ~cs
   | Ast.Values {bindings} -> rw_values ~env ~bindings 
-  | OperationsB0{ops;local} -> rw_operation ~env ~ops ~local
+  | Ast.OperationsB0{ops;local} -> rw_operation ~env ~ops ~local
   | _ -> { decls_before=[]; module_components=[]; env }
 
 
