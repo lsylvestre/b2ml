@@ -378,7 +378,7 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
 
     let env = 
       let idents = List.map (fun Ast.{y} -> Ast.x2xr y) xs in 
-      env_extends ~env ~vartype:Target.Var ~idents 
+      env_extends ~env ~vartype:Ast.Var ~idents 
     in
     let e,env = rw_instruction ~env ~inst:i in
     let vars = List.map (function 
@@ -668,7 +668,7 @@ let rw_concrete_variables ~(env : env) ~(xs : Ast.ident_ren Ast.annot list) =
 
   let env = 
     let idents=List.map (fun Ast.{y} -> y) xs in
-    env_extends ~env ~vartype:Target.Var ~idents 
+    env_extends ~env ~vartype:Ast.Var ~idents 
   in
   { decls_before=[];
     module_components=res;
@@ -692,7 +692,7 @@ let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
   (* les opérations sont mutuellement récursives *)
   let env = 
     let idents=List.map (function Ast.{desc={h={name}}} -> name) ops in
-    env_extends ~env ~vartype:Target.Cst ~idents 
+    env_extends ~env ~vartype:Ast.Cst ~idents 
   in
   let rec aux acc env = function
     | [] -> let res = [Target.LetFunRec (List.rev acc)] in
@@ -702,17 +702,17 @@ let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
       (* ajout des arguments de l'opération à l'environnement *)
       let env_op = 
         let idents = List.map (fun Ast.{y} -> Ast.x2xr y) args in
-        env_extends ~env ~vartype:Target.Cst ~idents 
+        env_extends ~env ~vartype:Ast.Cst ~idents 
       in 
 
       let env_op = 
         let idents = List.map (fun Ast.{y} -> Ast.x2xr y) outs in
-        env_extends ~env:env_op ~vartype:Target.Var ~idents 
+        env_extends ~env:env_op ~vartype:Ast.Var ~idents 
       in
 
       let e,env_op = rw_instruction env_op i in
 
-      let env = env_extends ~env ~vartype:Target.Cst ~idents:[name] in
+      let env = env_extends ~env ~vartype:Ast.Cst ~idents:[name] in
       let Ast.Id_ren{x;r} = name in  (* que faire avec le renommage de l'op ?? *)
       assert (r = []);
       let x = Names.normalize_ident x in
@@ -736,7 +736,7 @@ let rw_values ~(env : env) ~(bindings : Ast.bindings) =
       (List.rev acc,env)
     | (x,a)::xs -> 
       let e,env = rw_term ~env ~term:a in
-      let env = env_extends ~env ~vartype:Target.Cst ~idents:[Ast.x2xr x] in
+      let env = env_extends ~env ~vartype:Ast.Cst ~idents:[Ast.x2xr x] in
       let x = Names.normalize_ident x in
       let c = Target.Let{p=PVar x;e} in
       aux (c::acc) env xs
@@ -770,7 +770,7 @@ let rw_component ~(env : env) ~(component : Ast.component)
   | Ast.{desc=Component {name=m;parameters;clauses=cs}} ->
     Err.current_file_name := m;
     let env =
-      env_extends ~env ~vartype:Target.Cst
+      env_extends ~env ~vartype:Ast.Cst
         ~idents:(List.map (fun Ast.{y} -> Ast.x2xr y) parameters)
     in
     (* fusion des clauses inclusions de la machine et de son implémentation *)

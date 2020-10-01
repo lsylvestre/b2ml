@@ -423,13 +423,19 @@ externals_aux:
      parameters=plist(pair(IDENT,preceded(COL,typ_val)))
      envTy=separated_nonempty_list(AMPERSAND,external_clause) 
   END 
-  { let mch = Ast.x2xr name,Types.T_machine{parameters=List.map(fun (_,ty) -> ty) parameters} in
-    let envTy = mch :: List.map (fun (x,ty) -> (Id_ren {x;r=[name]},ty)) envTy in
+  { let mch = 
+      let xr = Ast.x2xr name 
+      and var = Cst 
+      and ty = Types.T_machine{parameters=List.map(fun (_,ty) -> ty) parameters} in
+      (xr,var,ty)
+    in
+    let envTy = mch :: List.map (fun (x,var,ty) -> (Id_ren {x;r=[name]},var,ty)) envTy in
     initEnvTy := envTy @ !initEnvTy ;
     initMchs := name :: !initMchs }
 
 external_clause:
-| x=IDENT COL ty=typ_val { (x,ty) }
+| VAR x=IDENT COL ty=typ_val { (x,Var,ty) }
+| x=IDENT COL ty=typ_val { (x,Cst,ty) }
 
 typ_val: 
 | ty=operation_t

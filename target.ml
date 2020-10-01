@@ -9,7 +9,7 @@
 
 type name = string
 
-type vartype = Var | Cst
+type vartype = Ast.vartype
 
 (** une expression est un calcul "pure" qui retourne une valeur *)
 

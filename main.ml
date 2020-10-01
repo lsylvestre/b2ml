@@ -75,7 +75,7 @@ let main ~runtime ~externals ~dst ~translate () =
   in
 
   (* inférence de type, annote certains noeud de l'AST *)
-  Typing.typComponents ~init_envTy:(!Ast.initEnvTy) components;
+  Typing.typComponents ~init_envTy:(List.map (fun (xr,var,ty) -> (xr,ty)) !Ast.initEnvTy) components;
 
   let oc = open_out (Filename.concat !destination_dir dst) in
     (* bibliothèque d'execution *)
@@ -99,7 +99,7 @@ let main ~runtime ~externals ~dst ~translate () =
 let () = 
   let translate ~components = 
      Translate.translate 
-        ~intial_env:(List.map (fun (x,ty) -> (x,Target.Cst)) !Ast.initEnvTy) 
+        ~intial_env:(List.map (fun (x,var,ty) -> (x,var)) !Ast.initEnvTy) 
         ~components
   in
   main ~runtime:(!runtime) ~externals:(!externals) ~dst:(!output_name) ~translate ()

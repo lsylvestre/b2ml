@@ -173,5 +173,7 @@ and header_operation = { return: ident annot list;
 
 and component_or_envTy = (component,envTy) either
 
-let initEnvTy = ref ([] : (ident_ren * Types.t) list)
+type vartype = Var | Cst
+
+let initEnvTy = ref ([] : (ident_ren * vartype * Types.t) list)
 let initMchs = ref ([] : ident list)
