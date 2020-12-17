@@ -38,7 +38,7 @@
 
 %start <Ast.component option> component_eof
 
-%left SEMICOL /* 20 */
+%right SEMICOL /* 20 */
 %left AMPERSAND Or /* 40 */
 
 /* %left EQ*/ /* 60 */
