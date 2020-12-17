@@ -59,6 +59,8 @@ and exp =
   | ML_E_seq of {es:exp list}
   (* alternative *)
   | ML_E_if of {c:exp;e1:exp;e2:exp}
+  (* alternative sans else *)
+  | ML_E_if_unit of {c:exp;e:exp}
   (* boucle *)
   | ML_E_while of {c:exp;e:exp}
   (* déclaration de variables locales *)

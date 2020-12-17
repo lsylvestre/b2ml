@@ -125,6 +125,12 @@ let rec print_exp ?(paren=false) = function
       (print_exp ~paren:true e1) 
       (print_exp ~paren:true e2)
 
+  | ML_E_if_unit {c;e} -> 
+    parenthesized paren @@ 
+    sptf "if %s then %s" 
+      (print_exp ~paren:true c) 
+      (print_exp ~paren:true e) 
+
   | ML_E_while{c;e} -> 
     parenthesized paren @@ 
     sptf "while %s do %s done" 
@@ -224,8 +230,8 @@ let rec print_decl ?(lvl=0) d =
   | LetFun{x;args;e} -> sptf "let %s %s = %s" x (mapcat " " print_patern args) (print_exp e)
   | LetFunRec funs -> 
     sptf "let rec " ^ 
-    (mapcat "\nand " (fun Target.{x;args;e} -> 
-                             sptf "%s %s = %s" 
+    (mapcat "\n\tand " (fun Target.{x;args;e} -> 
+                             sptf "%s %s = \n\t %s" 
                                  x 
                                  (mapcat " " print_patern args) 
                                  (print_exp e))) 

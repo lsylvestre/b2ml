@@ -162,6 +162,7 @@ module Typing = struct
     let open Ast in
     let {desc;loc} = c in
     match desc with
+    | True -> Types.T_bool
     | Compare{op=Eq;a1;a2}
     | Compare{op=Neq;a1;a2} -> 
       let ty1 = typTerm envTy a1 in

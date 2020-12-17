@@ -8,8 +8,9 @@
 /* analyse syntaxique */
 
 %{
-  open Ast
-  open Err
+    open Ast
+    open Types
+    open Err
 
   let none_is_empty_list = function 
       None -> [] 
@@ -17,13 +18,13 @@
 %}
 
 %token PRINT_INT PRINT_TYPE ILL_TYPED AMPERSAND QUOTE LPAREN RPAREN STAR 
-%token STAR_STAR PLUS COMMA MINUS DOT DOT_DOT SLASH SLASH_EQ COL COL_EQ 
+%token STAR_STAR PLUS COMMA MINUS DOT DOT_DOT SLASH SLASH_EQ COL COL_COL COL_EQ 
 %token SEMICOL LT LT_MINUS_MINUS LT_EQ EQ GT GT_EQ LCURLY PIPE_MINUS_GT RCURLY
 %token ASSERT BEGIN /* BOOL */ CASE CONCRETE_CONSTANTS CONCRETE_VARIABLES 
 %token CONSTANTS DO EITHER ELSE ELSIF END EXTENDS FALSE IF IMPLEMENTATION 
 %token IMPORTS IN INCLUDES INITIALISATION INT LOCAL_OPERATIONS MACHINE MAXINT 
 %token MININT NAT NAT1 OF OPERATIONS OR POW PROMOTES REFINES REFINEMENT
-%token SEES SETS THEN TRUE USES VALUES VAR VARIANT WHILE Bool Mod Not Or Pred
+%token SEES SETS PRE THEN TRUE USES VALUES VAR VARIANT WHILE Bool Mod Not Or Pred
 %token Rec Skip Struct Succ 
 
 %token EOF
@@ -37,7 +38,7 @@
 
 %start <Ast.component option> component_eof
 
-%left SEMICOL /* 20 */
+%right SEMICOL /* 20 */
 %left AMPERSAND Or /* 40 */
 
 /* %left EQ*/ /* 60 */
@@ -305,6 +306,7 @@ condition_desc:
 | c1=condition AMPERSAND c2=condition { And{c1;c2}}
 | c1=condition Or c2=condition        { Or{c1;c2}}
 | Not c=parenthesized(condition)      { Not{c} }
+| external_clause { True } (* The assumption is that types have been checked already *)
 
 %inline compare:
 | EQ       {Eq}
@@ -324,18 +326,21 @@ instruction:
 
 level1_instruction:
 | BEGIN i=instruction END 
-  { i }
+            { i }
+| PRE c=condition THEN i=instruction END { i } (* Preconditions are not visible in code *)
 | i=level1_instruction_desc {mkloc $loc @@ i}
 
 level1_instruction_desc:
 | VAR xs=separated_nonempty_list(COMMA,IDENT) IN i=instruction END
   { let xs = List.map mk_annot xs in I_var{xs;i} }
 | Skip
-  { I_skip }
+{ I_skip }
+| i=becomes_such_that_instruction
 | i=becomes_equal_instruction
 | i=callup_instruction
 | i=if_instruction
 | i=case_instruction {i}
+| x=IDENT COL_COL ty=typ_val { I_skip}
 | ASSERT c=condition THEN i=instruction END
   { I_assert{c;i} }
 
@@ -349,6 +354,10 @@ level1_instruction_desc:
   { Debug_print_type{a} }
 | ILL_TYPED a=term
   { Debug_ill_typed{a} }
+              
+becomes_such_that_instruction:
+| xr=ident_ren COL LPAREN external_clause  RPAREN { I_skip }
+
 
 becomes_equal_instruction:
 | xr=ident_ren COL_EQ a=term 
