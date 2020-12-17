@@ -51,6 +51,7 @@ let () =
         ( "REFINEMENT", REFINEMENT);
         ( "SEES", SEES);
         ( "SETS", SETS);
+        ( "PRE", PRE);
         ( "THEN", THEN);
         ( "TRUE", TRUE);
         ( "USES", USES);
