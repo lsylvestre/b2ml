@@ -125,6 +125,12 @@ let rec print_exp ?(paren=false) = function
       (print_exp ~paren:true e1) 
       (print_exp ~paren:true e2)
 
+  | ML_E_if_unit {c;e} -> 
+    parenthesized paren @@ 
+    sptf "if %s then %s" 
+      (print_exp ~paren:true c) 
+      (print_exp ~paren:true e) 
+
   | ML_E_while{c;e} -> 
     parenthesized paren @@ 
     sptf "while %s do %s done" 

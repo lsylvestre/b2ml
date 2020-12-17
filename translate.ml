@@ -436,7 +436,11 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
     let e,env = rw_instruction ~env ~inst:i in
     let res = Target.ML_E_while {c;e} in
     (res,env)
-
+  | Ast.I_if{c0;i0;cases=[];others=None} ->
+     let c,env = rw_condition ~env ~cond:c0 in
+     let e,env = rw_instruction ~env ~inst:i0 in
+     let res = Target.ML_E_if_unit {c;e} in 
+     (res,env)
   | Ast.I_if{c0;i0;cases;others} -> 
     let c,env = rw_condition ~env ~cond:c0 in
     let e1,env = rw_instruction ~env ~inst:i0 in
