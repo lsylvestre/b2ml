@@ -77,6 +77,7 @@ and b_array =
 
 and condition = condition_desc loc
 and condition_desc =
+  | True
   | Compare of {op:comparator;a1:term;a2:term}
   | And of {c1:condition;c2:condition}
   | Or of {c1:condition;c2:condition}

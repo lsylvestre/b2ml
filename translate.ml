@@ -305,6 +305,9 @@ and rw_comparator ~(op : Ast.comparator) : Target.binop =
 and rw_condition ~(env : env) ~(cond : Ast.condition) : (Target.exp * env) =
   let Ast.{desc;loc} = cond in
   match desc with
+  | Ast.True ->
+     let res =  Target.ML_E_literal {k = ML_C_bool true} in 
+     (res,env) 
 
   | Ast.Compare{op;a1;a2} ->
     (* C[op] ~> op
@@ -354,7 +357,6 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
   : (Target.exp * env) = 
   let Ast.{desc;loc} = inst in
   match desc with
-
   | Ast.I_skip -> 
     (* C[skip](p) ~> skip,p *)
     (Target.ML_E_skip,env)

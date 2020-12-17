@@ -306,6 +306,7 @@ condition_desc:
 | c1=condition AMPERSAND c2=condition { And{c1;c2}}
 | c1=condition Or c2=condition        { Or{c1;c2}}
 | Not c=parenthesized(condition)      { Not{c} }
+| external_clause { True } (* The assumption is that types have been checked already *)
 
 %inline compare:
 | EQ       {Eq}
