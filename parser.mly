@@ -333,7 +333,8 @@ level1_instruction_desc:
 | VAR xs=separated_nonempty_list(COMMA,IDENT) IN i=instruction END
   { let xs = List.map mk_annot xs in I_var{xs;i} }
 | Skip
-  { I_skip }
+{ I_skip }
+| i=becomes_such_that_instruction
 | i=becomes_equal_instruction
 | i=callup_instruction
 | i=if_instruction
@@ -352,6 +353,10 @@ level1_instruction_desc:
   { Debug_print_type{a} }
 | ILL_TYPED a=term
   { Debug_ill_typed{a} }
+              
+becomes_such_that_instruction:
+| xr=ident_ren COL LPAREN external_clause  RPAREN { I_skip }
+
 
 becomes_equal_instruction:
 | xr=ident_ren COL_EQ a=term 
