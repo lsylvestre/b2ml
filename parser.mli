@@ -85,6 +85,7 @@ type token =
   | CONCRETE_CONSTANTS
   | COMMA
   | COL_EQ
+  | COL_COL
   | COL
   | CASE
   | Bool

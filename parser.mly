@@ -8,8 +8,9 @@
 /* analyse syntaxique */
 
 %{
-  open Ast
-  open Err
+    open Ast
+    open Types
+    open Err
 
   let none_is_empty_list = function 
       None -> [] 
@@ -17,7 +18,7 @@
 %}
 
 %token PRINT_INT PRINT_TYPE ILL_TYPED AMPERSAND QUOTE LPAREN RPAREN STAR 
-%token STAR_STAR PLUS COMMA MINUS DOT DOT_DOT SLASH SLASH_EQ COL COL_EQ 
+%token STAR_STAR PLUS COMMA MINUS DOT DOT_DOT SLASH SLASH_EQ COL COL_COL COL_EQ 
 %token SEMICOL LT LT_MINUS_MINUS LT_EQ EQ GT GT_EQ LCURLY PIPE_MINUS_GT RCURLY
 %token ASSERT BEGIN /* BOOL */ CASE CONCRETE_CONSTANTS CONCRETE_VARIABLES 
 %token CONSTANTS DO EITHER ELSE ELSIF END EXTENDS FALSE IF IMPLEMENTATION 
@@ -337,6 +338,7 @@ level1_instruction_desc:
 | i=callup_instruction
 | i=if_instruction
 | i=case_instruction {i}
+| x=IDENT COL_COL ty=typ_val { I_skip}
 | ASSERT c=condition THEN i=instruction END
   { I_assert{c;i} }
 

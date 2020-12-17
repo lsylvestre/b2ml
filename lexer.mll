@@ -100,6 +100,7 @@ rule token = parse
 | '/'    { SLASH }
 | "/="   { SLASH_EQ }
 | ':'    { COL }
+| "::"   { COL_COL }
 | ":="   { COL_EQ }
 | ';'    { SEMICOL }
 | "<"    { LT }
