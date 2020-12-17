@@ -358,21 +358,17 @@ let rec rw_instruction ~(env : env) ~(inst : Ast.instruction)
   | Ast.I_skip -> 
     (* C[skip](p) ~> skip,p *)
     (Target.ML_E_skip,env)
-
+  | Ast.I_seq{i1={desc=Ast.I_skip;_};i2} ->
+     (* remove useless skip on the left-hand side of a sequence *)
+     rw_instruction ~env ~inst:i2
   | Ast.I_seq{i1;i2} ->
     (* C[i1](p) ~> (e1,p1)
        C[i2](p1) ~> (e2,p2) 
        --------------------------------
        C[i1;i2](p) ~> ((e1;e2),p2) *)
     let e1,env = rw_instruction ~env ~inst:i1 in
-    let e2,env = rw_instruction ~env ~inst:i2 in 
-    let es = match e1,e2 with
-      | Target.ML_E_seq{es=es1},Target.ML_E_seq{es=es2} -> es1@es2
-      | Target.ML_E_seq{es=es1},e2 -> es1@[e2]
-      | e1,Target.ML_E_seq{es=es2} -> e1::es2
-      | _ -> [e1;e2] in
-    (Target.ML_E_seq{es},env)
-
+    let e2,env = rw_instruction ~env ~inst:i2 in
+    (Target.ML_E_seq{es=[e1;e2]},env)
   | Ast.I_var{xs;i} ->
     let variables0 = env.variables in
 
