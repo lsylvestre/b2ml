@@ -725,7 +725,9 @@ let rw_operation ~(env : env) ~(ops : Ast.operationB0 Ast.loc list)
       aux (Target.{x;args;e}::acc) env xs
   in
   let res,env = aux [] env ops in
-  let res = Target.D_comment{s="operations"} :: res in
+  let s = if local then "local operations"
+            else "operations" in
+  let res = Target.D_comment{s} :: res in
   { decls_before=[];
     module_components=res;
     env }
