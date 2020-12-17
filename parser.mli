@@ -33,6 +33,7 @@ type token =
   | PROMOTES
   | PRINT_TYPE
   | PRINT_INT
+  | PRE
   | POW
   | PLUS
   | PIPE_MINUS_GT

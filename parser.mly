@@ -23,7 +23,7 @@
 %token CONSTANTS DO EITHER ELSE ELSIF END EXTENDS FALSE IF IMPLEMENTATION 
 %token IMPORTS IN INCLUDES INITIALISATION INT LOCAL_OPERATIONS MACHINE MAXINT 
 %token MININT NAT NAT1 OF OPERATIONS OR POW PROMOTES REFINES REFINEMENT
-%token SEES SETS THEN TRUE USES VALUES VAR VARIANT WHILE Bool Mod Not Or Pred
+%token SEES SETS PRE THEN TRUE USES VALUES VAR VARIANT WHILE Bool Mod Not Or Pred
 %token Rec Skip Struct Succ 
 
 %token EOF
@@ -324,7 +324,8 @@ instruction:
 
 level1_instruction:
 | BEGIN i=instruction END 
-  { i }
+            { i }
+| PRE c=condition THEN i=instruction END { i } (* Preconditions are not visible in code *)
 | i=level1_instruction_desc {mkloc $loc @@ i}
 
 level1_instruction_desc:
